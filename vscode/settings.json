@@ -1,0 +1,189 @@
+{
+  "zenMode.fullScreen": false,
+  "zenMode.centerLayout": true,
+  "zenMode.hideLineNumbers": false,
+  "zenMode.hideStatusBar": false,
+  "vim.smartRelativeLine": true,
+  "haskell.manageHLS": "GHCup",
+  "editor.fontFamily": "Iosevka Nerd Font, monospace",
+  "editor.fontWeight": "400",
+  "editor.fontSize": 18,
+  "editor.lineHeight": 1.4,
+  //"editor.fontLigatures": "'calt', 'ss01' 'ss02', 'ss03', 'ss04', 'ss05', 'ss06', 'ss07', 'ss08', 'ss09', 'liga'",
+  "editor.fontLigatures": "'ss08'",
+  "editor.inlayHints.enabled": "offUnlessPressed",
+  // Bracket-pair colorization
+  "editor.bracketPairColorization.enabled": false,
+  "editor.bracketPairColorization.independentColorPoolPerBracketType": false,
+  "editor.language.colorizedBracketPairs": null,
+  "editor.matchBrackets": "never",
+  // Bracket-pair guides
+  "editor.guides.bracketPairsHorizontal": false,
+  "editor.guides.highlightActiveBracketPair": false,
+  // indentation guides
+  "editor.guides.indentation": false,
+  "editor.guides.highlightActiveIndentation": false,
+  // cursor highlights
+  "editor.selectionHighlight": false,
+  "editor.occurrencesHighlight": "off",
+  "editor.renderLineHighlight": "none",
+  // color scheme overrides
+  "editor.tokenColorCustomizations": {
+    "[Real Retro*]": {
+      "comments": "#AA8800",
+      "textMateRules": [
+        {
+          "scope": [
+            "source"
+          ],
+          "settings": {
+            "foreground": "#202005",
+          }
+        },
+        {
+          "scope": [
+            "entity.name.type",
+            "entity.name.function",
+          ],
+          "settings": {
+            "foreground": "#887740",
+          }
+        },
+        {
+          "scope": [
+            "constant.numeric"
+          ],
+          "settings": {
+            "foreground": "#A04000",
+          }
+        },
+        {
+          "scope": [
+            "keyword.control",
+            "keyword.other",
+            "keyword.control.mutable",
+            "storage.modifier.mut.rust",
+            "storage.type.rust",
+          ],
+          "settings": {
+            "foreground": "#880000",
+          }
+        },
+        /*
+                {
+                    "scope": [
+                        "variable",
+                        "punctuation",
+                        "meta.function.parameter",
+                        "meta.function-call.arguments"
+                    ],
+                    "settings": {
+                        "foreground": "#494911"
+                        "fontStyle": ""
+                    }
+                }
+                    */
+      ],
+    },
+    "[Solarized Light]": {
+      "textMateRules": [
+        {
+          "scope": [
+            "variable",
+            "variable.other",
+            "keyword"
+          ],
+          "settings": {
+            "fontStyle": ""
+          }
+        },
+      ],
+    },
+    "[Gruvbox Minor Light*]": {
+      "textMateRules": [
+        {
+          "scope": [
+            "storage.type",
+            "entity.name.type"
+          ],
+          "settings": {
+            "foreground": "#b57614",
+          }
+        },
+        {
+          "scope": [
+            "entity.name",
+            "storage",
+            "meta.function",
+            "source.rust"
+          ],
+          "settings": {
+            "fontStyle": ""
+          }
+        },
+      ],
+    },
+  },
+  "workbench.colorCustomizations": {
+    "[Real Retro]": {
+      "editor.background": "#FDF6E3",
+      "activityBar.background": "#FDF6E3",
+      "sideBar.background": "#FDF6E3",
+      "statusBar.background": "#FDF6E3",
+      "statusBar.noFolderBackground": "#FDF6E3",
+      "titleBar.activeBackground": "#FDF6E3",
+      "titleBar.inactiveBackground": "#FDF6E3",
+      "panel.background": "#FDF6E3",
+      "terminal.background": "#FDF6E3",
+      "debugToolBar.background": "#FDF6E3",
+      "dropdown.background": "#FDF6E3",
+      "input.background": "#FDF6E3",
+      "list.activeSelectionBackground": "#FDF6E3",
+      "list.inactiveSelectionBackground": "#FDF6E3",
+      "list.hoverBackground": "#FDF6E3",
+      "list.focusBackground": "#FDF6E3",
+      "peekViewEditor.background": "#FDF6E3",
+      "peekViewResult.background": "#FDF6E3",
+      "tab.activeBackground": "#C7C7C7",
+      "tab.inactiveBackground": "#FDF6E3",
+      "tab.hoverBackground": "#FDF6E3",
+      "tab.unfocusedHoverBackground": "#FDF6E3",
+      "scrollbarSlider.background": "#FDF6E3",
+      "scrollbarSlider.hoverBackground": "#FDF6E3",
+      "scrollbarSlider.activeBackground": "#FDF6E3",
+      "editorGutter.background": "#FDF6E3",
+      "menu.background": "#FDF6E3",
+      "menubar.selectionBackground": "#FDF6E3",
+      "editorGroupHeader.tabsBackground": "#FDF6E3",
+      "editorGroupHeader.noTabsBackground": "#FDF6E3",
+      "editorPane.background": "#FDF6E3",
+      "terminalCursor.background": "#FDF6E3",
+      "terminalCursor.foreground": "#FDF6E3",
+      "widget.shadow": "#FDF6E3",
+      // borders        
+      "activityBar.border": "#777777",
+      "sideBar.border": "#777777",
+      "statusBar.border": "#777777",
+      "titleBar.border": "#777777",
+      "panel.border": "#777777",
+      "editorGroup.border": "#777777",
+      "editorGroupHeader.tabsBorder": "#777777",
+      "editorGroupHeader.border": "#777777",
+      "tab.border": "#777777",
+      "input.border": "#777777",
+      "dropdown.border": "#777777",
+      "list.dropBackground": "#777777",
+      "tree.indentGuidesStroke": "#777777",
+      "merge.border": "#777777",
+      "diffEditor.border": "#777777",
+      "peekView.border": "#777777",
+      "notebook.cellBorderColor": "#777777",
+      "notebook.focusedCellBorder": "#777777",
+      "notebook.inactiveFocusedCellBorder": "#777777",
+      "notebook.cellStatusBarItemHoverBackground": "#777777",
+      "debugToolBar.border": "#777777",
+      "terminal.border": "#777777"
+    }
+  },
+  "workbench.colorTheme": "Real Retro"
+}

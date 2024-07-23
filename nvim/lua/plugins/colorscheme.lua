@@ -2,19 +2,26 @@ vim.o.bg = "light"
 
 return {
   -- lush used by zenbones
-  { "rktjmp/lush.nvim" },
+  { "rktjmp/lush.nvim", lazy = true },
 
-  { "ellisonleao/gruvbox.nvim" },
+  { "ellisonleao/gruvbox.nvim", lazy = true },
 
-  { "rose-pine/neovim" },
+  { "rose-pine/neovim", lazy = true },
 
-  { "zenbones-theme/zenbones.nvim" },
+  { "zenbones-theme/zenbones.nvim", lazy = true },
 
-  -- Configure LazyVim to load gruvbox
+  {
+    dir = "../../colors/gruvbones.lua",
+    config = function()
+      require("colors.gruvbones")
+    end,
+    lazy = true,
+  },
+
   {
     "LazyVim/LazyVim",
     opts = {
-      colorscheme = "zenbones",
+      colorscheme = "gruvbones",
     },
   },
 }

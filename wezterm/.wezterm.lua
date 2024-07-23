@@ -13,10 +13,13 @@ config.font = wezterm.font({
 	family = "Iosevka Nerd Font",
 	harfbuzz_features = { "ss08", "liga" },
 })
-config.font_size = 16
+config.freetype_load_target = "HorizontalLcd"
+config.font_size = 15
+config.line_height = 1.05
 
 config.color_scheme = "rose-pine-dawn"
 config.color_scheme = "zenbones"
+config.color_scheme = "GruvboxLight"
 
 -- program
 config.default_prog = { "C:/Program Files/Git/bin/bash.exe" }
@@ -47,4 +50,3 @@ wezterm.on("user-var-changed", function(window, pane, name, value)
 end)
 
 return config
-

@@ -17,11 +17,18 @@ return {
     end,
     lazy = true,
   },
+  {
+    dir = "../../colors/mybones.lua",
+    config = function()
+      require("colors.mybones")
+    end,
+    lazy = true,
+  },
 
   {
     "LazyVim/LazyVim",
     opts = {
-      colorscheme = "gruvbones",
+      colorscheme = "mybones",
     },
   },
 }

@@ -97,6 +97,14 @@ vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
   pattern = { "*.cs" },
   callback = select_solution_file_and_setup_lsp,
 })
+
+vim.api.nvim_create_autocmd({ "BufNewFile", "BufRead" }, {
+  pattern = "*.wgsl",
+  callback = function()
+    vim.bo.filetype = "wgsl"
+  end,
+})
+
 --[[
 local original_lsp_start = vim.lsp.start_client
 

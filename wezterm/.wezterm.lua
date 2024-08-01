@@ -1,9 +1,3 @@
---[[
-1. clean install neovim / wezterm 
-2. wingit install ripgrep
-3. install luarocks
---]]
-
 local wezterm = require("wezterm")
 
 local config = wezterm.config_builder()
@@ -14,15 +8,17 @@ config.font = wezterm.font({
 	harfbuzz_features = { "ss08", "liga" },
 })
 config.freetype_load_target = "HorizontalLcd"
-config.font_size = 15
-config.line_height = 1.05
+config.font_size = 16
+config.line_height = 1.00
 
 config.color_scheme = "rose-pine-dawn"
 config.color_scheme = "zenbones"
 config.color_scheme = "GruvboxLight"
 
--- program
-config.default_prog = { "C:/Program Files/Git/bin/bash.exe" }
+-- default cli program
+if wezterm.target_triple == "x86_64-pc-windows-msvc" then
+	config.default_prog = { "C:/Program Files/Git/bin/bash.exe" }
+end
 config.audible_bell = "Disabled"
 
 -- zen mode neovim fix

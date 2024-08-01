@@ -13,7 +13,6 @@ return {
         end, { desc = "Rust Debuggables", buffer = bufnr })
       end,
       default_settings = {
-        -- rust-analyzer language server configuration
         ["rust-analyzer"] = {
           cargo = {
             allFeatures = true,
@@ -22,11 +21,10 @@ return {
               enable = true,
             },
             cfgs = {
-              "",
+              "", -- all configs get analyed
             },
           },
-          -- Add clippy lints for Rust.
-          checkOnSave = true,
+          checkOnSave = true, -- clippy hints
           procMacro = {
             enable = true,
             ignored = {
@@ -37,7 +35,7 @@ return {
           },
           diagnostics = {
             disabled = {
-              "inactive-code",
+              -- "inactive-code",
             },
           },
         },

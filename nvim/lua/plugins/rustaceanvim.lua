@@ -21,7 +21,7 @@ return {
               enable = true,
             },
             cfgs = {
-              "", -- all configs get analyed
+              "",
             },
           },
           checkOnSave = true, -- clippy hints

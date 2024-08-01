@@ -1,6 +1,6 @@
 # My Development Environment
 
-An attempt to consolidate and track my dev tool configurations.
+A hub for my dev configs.
 
 ## Tools
 

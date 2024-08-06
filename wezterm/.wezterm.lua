@@ -5,11 +5,12 @@ local config = wezterm.config_builder()
 -- appearance
 config.font = wezterm.font({
 	family = "Iosevka Nerd Font",
-	harfbuzz_features = { "ss08", "liga" },
+	harfbuzz_features = { "liga", "ss08" },
 })
 config.freetype_load_target = "HorizontalLcd"
-config.font_size = 16
+config.font_size = 15
 config.line_height = 1.00
+config.max_fps = 120
 
 config.color_scheme = "rose-pine-dawn"
 config.color_scheme = "zenbones"
@@ -44,5 +45,25 @@ wezterm.on("user-var-changed", function(window, pane, name, value)
 	end
 	window:set_config_overrides(overrides)
 end)
+
+-- color schemes
+config.color_scheme = "GruvboxDark"
+
+-- toggle light/dark scheme
+wezterm.on("toggle-dark-mode", function(window, pane)
+	local light_scheme = "GruvboxLight"
+	local dark_scheme = "GruvboxDark"
+	local overrides = window:get_config_overrides() or {}
+	if overrides.color_scheme == light_scheme then
+		overrides.color_scheme = dark_scheme
+	else
+		overrides.color_scheme = light_scheme
+	end
+	window:set_config_overrides(overrides)
+end)
+
+config.keys = {
+	{ key = "p", mods = "CTRL", action = wezterm.action({ EmitEvent = "toggle-dark-mode" }) },
+}
 
 return config

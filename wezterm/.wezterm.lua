@@ -12,10 +12,6 @@ config.font_size = 15
 config.line_height = 1.00
 config.max_fps = 120
 
-config.color_scheme = "rose-pine-dawn"
-config.color_scheme = "zenbones"
-config.color_scheme = "GruvboxLight"
-
 config.adjust_window_size_when_changing_font_size = false
 
 -- default cli program
@@ -49,23 +45,22 @@ wezterm.on("user-var-changed", function(window, pane, name, value)
 end)
 
 -- color schemes
-config.color_scheme = "GruvboxDark"
-
--- toggle light/dark scheme
-wezterm.on("toggle-dark-mode", function(window, pane)
-	local light_scheme = "GruvboxLight"
-	local dark_scheme = "GruvboxDark"
-	local overrides = window:get_config_overrides() or {}
-	if overrides.color_scheme == light_scheme then
-		overrides.color_scheme = dark_scheme
+function scheme_for_appearance(appearance)
+	if appearance:find("Dark") then
+		return "GruvboxDark"
 	else
-		overrides.color_scheme = light_scheme
+		return "GruvboxLight"
 	end
-	window:set_config_overrides(overrides)
-end)
+end
 
-config.keys = {
-	{ key = "p", mods = "CTRL", action = wezterm.action({ EmitEvent = "toggle-dark-mode" }) },
-}
+wezterm.on("window-config-reloaded", function(window, pane)
+	local overrides = window:get_config_overrides() or {}
+	local appearance = window:get_appearance()
+	local scheme = scheme_for_appearance(appearance)
+	if overrides.color_scheme ~= scheme then
+		overrides.color_scheme = scheme
+		window:set_config_overrides(overrides)
+	end
+end)
 
 return config

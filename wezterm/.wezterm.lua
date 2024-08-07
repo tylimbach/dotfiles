@@ -16,6 +16,8 @@ config.color_scheme = "rose-pine-dawn"
 config.color_scheme = "zenbones"
 config.color_scheme = "GruvboxLight"
 
+config.adjust_window_size_when_changing_font_size = false
+
 -- default cli program
 if wezterm.target_triple == "x86_64-pc-windows-msvc" then
 	config.default_prog = { "C:/Program Files/Git/bin/bash.exe" }

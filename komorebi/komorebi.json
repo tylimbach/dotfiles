@@ -1,68 +1,61 @@
 {
-    "$schema": "https://raw.githubusercontent.com/LGUG2Z/komorebi/v0.1.28/schema.json",
-    "app_specific_configuration_path": "$Env:USERPROFILE/applications.yaml",
-    "window_hiding_behaviour": "Cloak",
-    "cross_monitor_move_behaviour": "Insert",
-    "default_workspace_padding": 5,
-    "default_container_padding": 5,
-    "border": true,
-    "border_width": 10,
-    "border_offset": -1,
-    "border_colours": {
-        "single": "#886611",
-        "stack": "#00a542",
-        "monocle": "#ff3399",
-        "unfocused": "#808080"
-    },
-    "stackbar": {
-        "height": 40,
-        "mode": "OnStack",
-        "tabs": {
-            "width": 300,
-            "focused_text": "#00a542",
-            "unfocused_text": "#b3b3b3",
-            "background": "#141414"
-        }
-    },
-    "monitors": [
+  "$schema": "https://raw.githubusercontent.com/LGUG2Z/komorebi/v0.1.28/schema.json",
+  "app_specific_configuration_path": "$Env:USERPROFILE/applications.yaml",
+  "window_hiding_behaviour": "Cloak",
+  "cross_monitor_move_behaviour": "Insert",
+  "default_workspace_padding": 15,
+  "default_container_padding": 15,
+  "border": true,
+  "border_width": 10,
+  "border_offset": -1,
+  "border_colours": {
+    "single": "#2084cc",
+    "stack": "#00a542",
+    "monocle": "#ff3399",
+    "unfocused": "#808080"
+  },
+  "display_index_preferences": {
+    "0": "SAM7476-4&311f1208&0&UID24645",
+    "1": "LGD06B3-4&311f1208&0&UID8388688"
+  },
+  "monitors": [
+    {
+      "workspaces": [
         {
-            "workspaces": [
-                {
-                    "name": "I",
-                    "layout": "BSP"
-                },
-                {
-                    "name": "II",
-                    "layout": "VerticalStack"
-                },
-                {
-                    "name": "III",
-                    "layout": "HorizontalStack"
-                },
-                {
-                    "name": "IV",
-                    "layout": "UltrawideVerticalStack"
-                },
-                {
-                    "name": "V",
-                    "layout": "Rows"
-                },
-                {
-                    "name": "VI",
-                    "layout": "Grid"
-                },
-                {
-                    "name": "VII",
-                    "layout": "RightMainVerticalStack"
-                }
-            ]
-        }
-    ],
-    "float_rules": [
+          "name": "main",
+          "custom_layout": "C:/Users/tlimbach/komorebi/custom_layouts/uw.json"
+        },
         {
-            "kind": "Exe",
-            "id": "W.",
-            "matching_strategy": "StartsWith"
+          "name": "info",
+          "custom_layout": "C:/Users/tlimbach/komorebi/custom_layouts/uw.json"
+        },
+        {
+          "name": "columns",
+          "layout": "Grid"
         }
-    ]
+      ]
+    },
+    {
+      "workspaces": [
+        {
+          "name": "personal",
+          "layout": "Grid"
+        }
+      ]
+    }
+  ],
+  "float_rules": [
+    {
+      "kind": "Exe",
+      "id": "W.",
+      "matching_strategy": "StartsWith"
+    }
+  ],
+  "tray_and_multi_window_applications": [
+    {
+      "kind": "Class",
+      "id": "Webex",
+      "matching_strategy": "Equals"
+    }
+  ]
 }

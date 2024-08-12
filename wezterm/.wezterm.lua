@@ -12,6 +12,7 @@ config.font_size = 15
 config.line_height = 1.00
 config.max_fps = 120
 
+config.window_background_opacity = 0.95
 config.adjust_window_size_when_changing_font_size = false
 
 -- default cli program

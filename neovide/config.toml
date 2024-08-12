@@ -1,7 +1,9 @@
 [font]
-#normal = ["Monaspace Neon"]
-normal = ["Iosevka Nerd Font"]
-size = 16
+#normal = ["MonaspiceKr Nerd Font"]
+3normal = ["MonaspiceAr Nerd Font"]
+#normal = ["MonaspiceNe Nerd Font"]
+#normal = ["Iosevka Nerd Font"]
+size = 15
 hinting = "full"
 edging = "subpixelantialias"
 
@@ -21,6 +23,19 @@ edging = "subpixelantialias"
   "+ss09",
 ]
 "Monaspace Argon" = [
+  "liga",
+  "calt",
+  "+ss01",
+  "+ss02",
+  "+ss03",
+  "+ss04",
+  "+ss05",
+  "+ss06",
+  "+ss07",
+  "+ss08",
+  "+ss09",
+]
+"Monaspice*" = [
   "liga",
   "calt",
   "+ss01",

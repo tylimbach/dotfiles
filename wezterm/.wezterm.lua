@@ -4,13 +4,17 @@ local config = wezterm.config_builder()
 
 -- appearance
 config.font = wezterm.font({
-	family = "Iosevka Nerd Font",
-	harfbuzz_features = { "liga", "ss08" },
+	family = "Monaspace Neon",
+	harfbuzz_features = { "liga", "calt", "ss01", "ss02", "ss03", "ss04", "ss05", "ss06", "ss07", "ss08", "ss09" },
+	weight = "Medium",
 })
-config.freetype_load_target = "HorizontalLcd"
-config.font_size = 15
-config.line_height = 1.00
+config.font_size = 14
+
+config.freetype_load_flags = "NO_HINTING"
+config.front_end = "WebGpu"
+config.freetype_load_target = "Light"
 config.max_fps = 120
+config.line_height = 1
 
 config.window_background_opacity = 0.95
 config.adjust_window_size_when_changing_font_size = false

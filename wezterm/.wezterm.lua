@@ -4,7 +4,8 @@ local config = wezterm.config_builder()
 
 -- appearance
 config.font = wezterm.font({
-	family = "Monaspace Neon",
+	family = "CaskaydiaCove Nerd Font",
+	-- family = "CaskaydiaCove Nerd Font",
 	harfbuzz_features = { "liga", "calt", "ss01", "ss02", "ss03", "ss04", "ss05", "ss06", "ss07", "ss08", "ss09" },
 	weight = "Medium",
 })
@@ -49,9 +50,16 @@ wezterm.on("user-var-changed", function(window, pane, name, value)
 	window:set_config_overrides(overrides)
 end)
 
+local function get_appearance()
+	if wezterm.gui then
+		return wezterm.gui.get_appearence()
+	end
+	return 'Dark'
+end
+
 -- color schemes
-function scheme_for_appearance(appearance)
-	if appearance:find("Dark") then
+local function scheme_for_appearance(appearance)
+	if appearance:find 'Dark' then
 		return "GruvboxDark"
 	else
 		return "GruvboxLight"
@@ -67,5 +75,7 @@ wezterm.on("window-config-reloaded", function(window, pane)
 		window:set_config_overrides(overrides)
 	end
 end)
+
+-- config.color_scheme = scheme_for_appearance(get_appearance())
 
 return config

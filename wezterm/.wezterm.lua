@@ -2,31 +2,34 @@ local wezterm = require("wezterm")
 
 local config = wezterm.config_builder()
 
--- appearance
 config.font = wezterm.font({
-	family = "CaskaydiaCove Nerd Font",
+	family = "Iosevka Term Slab",
 	-- family = "CaskaydiaCove Nerd Font",
-	harfbuzz_features = { "liga", "calt", "ss01", "ss02", "ss03", "ss04", "ss05", "ss06", "ss07", "ss08", "ss09" },
-	weight = "Medium",
+	-- family = "MonoLisa",
+	-- family = "Berkeley Mono Trial",
+	-- family = "DejaVuSansM Nerd Font",
+	-- family = "CommitMono",
+	-- family = "Operator Mono",
+	-- family = "Operator Mono Lig",
+	-- family = "FiraCode Nerd Font",
+	harfbuzz_features = { "liga" },
 })
-config.font_size = 14
+config.font_size = 12
 
-config.freetype_load_flags = "NO_HINTING"
-config.front_end = "WebGpu"
-config.freetype_load_target = "Light"
+-- config.freetype_load_flags = "NO_HINTING"
+config.front_end = "OpenGL"
+config.freetype_load_target = "HorizontalLcd"
 config.max_fps = 120
-config.line_height = 1
+config.line_height = 1.0
 
-config.window_background_opacity = 0.95
+config.window_background_opacity = 1.00
 config.adjust_window_size_when_changing_font_size = false
 
--- default cli program
 if wezterm.target_triple == "x86_64-pc-windows-msvc" then
 	config.default_prog = { "C:/Program Files/Git/bin/bash.exe" }
 end
 config.audible_bell = "Disabled"
 
--- zen mode neovim fix
 wezterm.on("user-var-changed", function(window, pane, name, value)
 	local overrides = window:get_config_overrides() or {}
 	if name == "ZEN_MODE" then
@@ -50,19 +53,11 @@ wezterm.on("user-var-changed", function(window, pane, name, value)
 	window:set_config_overrides(overrides)
 end)
 
-local function get_appearance()
-	if wezterm.gui then
-		return wezterm.gui.get_appearence()
-	end
-	return 'Dark'
-end
-
--- color schemes
 local function scheme_for_appearance(appearance)
 	if appearance:find 'Dark' then
-		return "GruvboxDark"
+		return "Gruvbox dark, soft (base16)"
 	else
-		return "GruvboxLight"
+		return "Gruvbox light, soft (base16)"
 	end
 end
 
@@ -75,7 +70,5 @@ wezterm.on("window-config-reloaded", function(window, pane)
 		window:set_config_overrides(overrides)
 	end
 end)
-
--- config.color_scheme = scheme_for_appearance(get_appearance())
 
 return config

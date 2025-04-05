@@ -3,20 +3,23 @@ local wezterm = require("wezterm")
 local config = wezterm.config_builder()
 
 config.font = wezterm.font({
-	family = "Iosevka Term Slab",
+	-- family = "Iosevka Term Slab",
 	-- family = "CaskaydiaCove Nerd Font",
 	-- family = "MonoLisa",
-	-- family = "Berkeley Mono Trial",
+	family = "Berkeley Mono",
+	-- family = "Monaspace Argon",
+	-- family = "Monaspace Neon",
 	-- family = "DejaVuSansM Nerd Font",
 	-- family = "CommitMono",
 	-- family = "Operator Mono",
 	-- family = "Operator Mono Lig",
 	-- family = "FiraCode Nerd Font",
-	harfbuzz_features = { "liga" },
+	-- harfbuzz_features = { "liga", "calt", "ss01", "ss02", "ss03", "ss04", "ss05", "ss06", "ss07", "ss08", "ss09" },
 })
 config.font_size = 12
 
 -- config.freetype_load_flags = "NO_HINTING"
+-- config.enable_wayland = false
 config.front_end = "OpenGL"
 config.freetype_load_target = "HorizontalLcd"
 config.max_fps = 120

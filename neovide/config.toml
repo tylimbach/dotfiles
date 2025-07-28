@@ -1,8 +1,11 @@
 [font]
-normal = ["Iosevka Term Slab"]
+normal = ["Iosevka Nerd Font"]
+#normal = ["Berkeley Mono", "Iosevka Nerd Font", "Operator Mono Lig"]
+#normal = ["Operator Mono Lig", "Operator Mono", "Iosevka Nerd Font"]
+
 size = 12
 hinting = "full"
 edging = "subpixelantialias"
 
 [font.features]
-"Iosevka Term Slab" = ["liga"]
+"Operator Mono Lig" = ["liga"]

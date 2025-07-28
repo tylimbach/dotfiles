@@ -26,6 +26,7 @@ config.wsl_domains = {
 config.default_domain = "WSL:Ubuntu"
 
 config.font = wezterm.font_with_fallback {
+	'Iosevka Nerd Font',
 	'Operator Mono Lig',
 	'Operator Mono Medium',
 	'Operator Mono Bold',

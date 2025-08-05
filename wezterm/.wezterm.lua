@@ -14,7 +14,6 @@ local config = wezterm.config_builder()
 -- 	-- family = "Operator Mono",
 -- 	-- family = "Operator Mono Lig",
 -- 	-- family = "FiraCode Nerd Font",
--- 	-- harfbuzz_features = { "liga", "calt", "ss01", "ss02", "ss03", "ss04", "ss05", "ss06", "ss07", "ss08", "ss09" },
 -- })
 
 config.wsl_domains = {
@@ -23,23 +22,102 @@ config.wsl_domains = {
     distribution = "Ubuntu-22.04",
   },
 }
-config.default_domain = "WSL:Ubuntu"
+-- config.default_domain = "WSL:Ubuntu"
 
 config.font = wezterm.font_with_fallback {
-	'Iosevka Nerd Font',
+	{
+		family = 'MonoLisa',
+		harfbuzz_features = {
+			-- liga - Coding ligatures
+			-- "liga",
+
+			-- frac - Fractions, turns 1/2 into ½
+			-- "frac",
+
+			-- onum - Old style numbers
+			-- "onum",
+
+			-- calt - Whitespace ligatures
+			"calt",
+
+			-- zero - Slashed zero
+			-- "zero",
+
+			-- ss01 - Normal asterisk
+			-- "ss01",
+
+			-- ss02 - Italic Script Version
+			-- "ss02",
+
+			-- ss03 - Alternative g
+			-- "ss03",
+
+			-- ss04 - Other alternative g
+			-- "ss04",
+
+			-- ss05 - Alternative ß
+			-- "ss05",
+
+			-- ss06 - Alternative @
+			-- "ss06",
+
+			-- ss07 - Alternative curly brackets {}
+			-- "ss07",
+
+			-- ss08 - Alternative parenthesis ()
+			-- "ss08",
+
+			-- ss09 - Alternative >= ligature
+			-- "ss09",
+
+			-- ss10 - Other alternative >= ligature
+			-- "ss10",
+
+			-- ss11 - Centered hexadecimal x 0xF
+			-- "ss11",
+
+			-- ss12 - Thin backslash
+			-- "ss12",
+
+			-- ss13 - Alternative $
+			-- "ss13",
+
+			-- ss14 - Alternative &
+			-- "ss14",
+
+			-- ss15 - i without serif
+			-- "ss15",
+
+			-- ss16 - r without serif
+			-- "ss16",
+
+			-- ss17 - Alternative .= and ..= ligature
+			-- "ss17",
+
+			-- ss18 - Alternative @
+			-- "ss18",
+		},
+	},
+	{
+		family = 'Iosevka Nerd Font',
+		harfbuzz_features = { "liga", "calt", "ss03"},
+	},
+	{
+		family = 'Monaspace Argon',
+		harfbuzz_features = { "liga", "calt", "ss01", "ss02", "ss03", "ss04", "ss05", "ss06", "ss07", "ss08", "ss09" },
+	},
 	'Operator Mono Lig',
+	'Berkeley Mono',
 	'Operator Mono Medium',
 	'Operator Mono Bold',
-	'Monaspace Argon',
-	'Berkeley Mono',
 }
 config.font_size = 12
 config.force_reverse_video_cursor = true
 
 -- config.freetype_load_flags = "NO_HINTING"
 -- config.enable_wayland = false
-config.front_end = "OpenGL"
-config.freetype_load_target = "HorizontalLcd"
+-- config.front_end = "OpenGL"
+-- config.freetype_load_target = "HorizontalLcd"
 config.max_fps = 120
 config.line_height = 1.0
 
@@ -52,6 +130,11 @@ config.keys = {
     mods = 'CTRL',
     action = wezterm.action.CloseCurrentPane { confirm = false },
   },
+    {
+      key = "f",
+      mods = "CTRL|CMD",
+      action = wezterm.action.ToggleFullScreen,
+    },
 }
 
 if wezterm.target_triple == "x86_64-pc-windows-msvc" then

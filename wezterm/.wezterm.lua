@@ -25,11 +25,14 @@ config.wsl_domains = {
 -- config.default_domain = "WSL:Ubuntu"
 
 config.font = wezterm.font_with_fallback {
+	'Operator Mono',
+	-- 'Berkeley Mono',
+	-- 'Iosevka Nerd Font',
 	{
 		family = 'MonoLisa',
 		harfbuzz_features = {
 			-- liga - Coding ligatures
-			-- "liga",
+			"liga=0",
 
 			-- frac - Fractions, turns 1/2 into ½
 			-- "frac",
@@ -102,14 +105,8 @@ config.font = wezterm.font_with_fallback {
 		family = 'Iosevka Nerd Font',
 		harfbuzz_features = { "liga", "calt", "ss03"},
 	},
-	{
-		family = 'Monaspace Argon',
-		harfbuzz_features = { "liga", "calt", "ss01", "ss02", "ss03", "ss04", "ss05", "ss06", "ss07", "ss08", "ss09" },
-	},
-	'Operator Mono Lig',
-	'Berkeley Mono',
-	'Operator Mono Medium',
-	'Operator Mono Bold',
+	'JuliaMono',
+	'UnifontExMono',
 }
 config.font_size = 12
 config.force_reverse_video_cursor = true
@@ -125,16 +122,30 @@ config.window_background_opacity = 1.00
 config.adjust_window_size_when_changing_font_size = false
 
 config.keys = {
-  {
-    key = 'w',
-    mods = 'CTRL',
-    action = wezterm.action.CloseCurrentPane { confirm = false },
-  },
-    {
-      key = "f",
-      mods = "CTRL|CMD",
-      action = wezterm.action.ToggleFullScreen,
-    },
+	-- Disable Ctrl-W so Neovim can use it for window commands
+	{
+		key = 'w',
+		mods = 'CTRL',
+		action = wezterm.action.DisableDefaultAssignment,
+	},
+	-- Use Ctrl-Shift-W to close the current pane/tab instead
+	{
+		key = 'w',
+		mods = 'CTRL|SHIFT',
+		action = wezterm.action.CloseCurrentPane { confirm = true },
+	},
+	-- Shift-Enter sends Escape+Enter (useful for some terminals)
+	{
+		key = "Enter",
+		mods = "SHIFT",
+		action = wezterm.action.SendString("\x1b\r"),
+	},
+	-- Toggle fullscreen
+	{
+		key = "f",
+		mods = "CTRL|CMD",
+		action = wezterm.action.ToggleFullScreen,
+	},
 }
 
 if wezterm.target_triple == "x86_64-pc-windows-msvc" then
@@ -180,6 +191,20 @@ local function scheme_for_appearance(appearance)
   end
 end
 
+local function update_appearance(window)
+  local appearance = get_appearance()
+  local scheme = scheme_for_appearance(appearance)
+  local overrides = window:get_config_overrides() or {}
+  overrides.color_scheme = scheme
+  window:set_config_overrides(overrides)
+end
+
+wezterm.on('window-config-reloaded', update_appearance)
+
+-- Also update on status refresh to catch appearance changes
+wezterm.on('update-right-status', update_appearance)
+
+-- Set initial color scheme
 config.color_scheme = scheme_for_appearance(get_appearance())
 
 return config

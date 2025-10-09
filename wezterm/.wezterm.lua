@@ -17,14 +17,16 @@ local config = wezterm.config_builder()
 -- })
 
 config.wsl_domains = {
-  {
-    name = "WSL:Ubuntu",
-    distribution = "Ubuntu-22.04",
-  },
+	{
+		name = "WSL:Ubuntu",
+		distribution = "Ubuntu-22.04",
+	},
 }
 -- config.default_domain = "WSL:Ubuntu"
 
 config.font = wezterm.font_with_fallback {
+	'Operator Mono Lig',
+	'Operator Mono Medium',
 	'Operator Mono',
 	-- 'Berkeley Mono',
 	-- 'Iosevka Nerd Font',
@@ -103,7 +105,7 @@ config.font = wezterm.font_with_fallback {
 	},
 	{
 		family = 'Iosevka Nerd Font',
-		harfbuzz_features = { "liga", "calt", "ss03"},
+		harfbuzz_features = { "liga", "calt", "ss03" },
 	},
 	'JuliaMono',
 	'UnifontExMono',
@@ -146,6 +148,12 @@ config.keys = {
 		mods = "CTRL|CMD",
 		action = wezterm.action.ToggleFullScreen,
 	},
+	-- Pass Ctrl+/ through to Neovim (Windows compatibility)
+	{
+		key = "/",
+		mods = "CTRL",
+		action = wezterm.action.SendKey { key = "/", mods = "CTRL" },
+	},
 }
 
 if wezterm.target_triple == "x86_64-pc-windows-msvc" then
@@ -177,26 +185,26 @@ wezterm.on("user-var-changed", function(window, pane, name, value)
 end)
 
 local function get_appearance()
-  if wezterm.gui then
-    return wezterm.gui.get_appearance()
-  end
-  return 'Dark'
+	if wezterm.gui then
+		return wezterm.gui.get_appearance()
+	end
+	return 'Dark'
 end
 
 local function scheme_for_appearance(appearance)
-  if appearance:find 'Dark' then
-	return "Gruvbox dark, soft (base16)"
-  else
-	return "Gruvbox light, soft (base16)"
-  end
+	if appearance:find 'Dark' then
+		return "Gruvbox dark, soft (base16)"
+	else
+		return "Gruvbox light, soft (base16)"
+	end
 end
 
 local function update_appearance(window)
-  local appearance = get_appearance()
-  local scheme = scheme_for_appearance(appearance)
-  local overrides = window:get_config_overrides() or {}
-  overrides.color_scheme = scheme
-  window:set_config_overrides(overrides)
+	local appearance = get_appearance()
+	local scheme = scheme_for_appearance(appearance)
+	local overrides = window:get_config_overrides() or {}
+	overrides.color_scheme = scheme
+	window:set_config_overrides(overrides)
 end
 
 wezterm.on('window-config-reloaded', update_appearance)

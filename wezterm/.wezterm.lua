@@ -212,7 +212,14 @@ wezterm.on('window-config-reloaded', update_appearance)
 -- Also update on status refresh to catch appearance changes
 wezterm.on('update-right-status', update_appearance)
 
--- Set initial color scheme
+-- Set NVIM_THEME environment variable for child processes (like Neovim)
+
+local appearance = get_appearance()
+local theme = appearance:find('Dark') and 'dark' or 'light'
+config.set_environment_variables = {
+  NVIM_THEME = theme,
+}
+
 config.color_scheme = scheme_for_appearance(get_appearance())
 
 return config

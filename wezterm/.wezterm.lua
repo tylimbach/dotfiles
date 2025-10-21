@@ -25,9 +25,11 @@ config.wsl_domains = {
 -- config.default_domain = "WSL:Ubuntu"
 
 config.font = wezterm.font_with_fallback {
-	'Operator Mono Lig',
 	'Operator Mono Medium',
-	'Operator Mono',
+	'Operator Mono Bold',
+	'Operator Mono Lig',
+	'UnifontExMono',
+	'JuliaMono',
 	-- 'Berkeley Mono',
 	-- 'Iosevka Nerd Font',
 	{
@@ -107,8 +109,6 @@ config.font = wezterm.font_with_fallback {
 		family = 'Iosevka Nerd Font',
 		harfbuzz_features = { "liga", "calt", "ss03" },
 	},
-	'JuliaMono',
-	'UnifontExMono',
 }
 config.font_size = 12
 config.force_reverse_video_cursor = true
@@ -201,9 +201,13 @@ end
 
 local function update_appearance(window)
 	local appearance = get_appearance()
+	local theme = appearance:find('Dark') and 'dark' or 'light'
 	local scheme = scheme_for_appearance(appearance)
 	local overrides = window:get_config_overrides() or {}
 	overrides.color_scheme = scheme
+	overrides.set_environment_variables = {
+	  NVIM_THEME = theme,
+	}
 	window:set_config_overrides(overrides)
 end
 
@@ -213,13 +217,11 @@ wezterm.on('window-config-reloaded', update_appearance)
 wezterm.on('update-right-status', update_appearance)
 
 -- Set NVIM_THEME environment variable for child processes (like Neovim)
-
 local appearance = get_appearance()
+config.color_scheme = scheme_for_appearance(appearance)
 local theme = appearance:find('Dark') and 'dark' or 'light'
 config.set_environment_variables = {
   NVIM_THEME = theme,
 }
-
-config.color_scheme = scheme_for_appearance(get_appearance())
 
 return config

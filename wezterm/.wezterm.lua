@@ -154,6 +154,11 @@ config.keys = {
 		mods = "CTRL",
 		action = wezterm.action.SendKey { key = "/", mods = "CTRL" },
 	},
+	{
+		key = ' ',
+		mods = 'CTRL',
+		action = wezterm.action.SendKey { key = ' ', mods = 'CTRL' },
+	}
 }
 
 if wezterm.target_triple == "x86_64-pc-windows-msvc" then

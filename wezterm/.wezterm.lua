@@ -1,7 +1,9 @@
 local wezterm = require("wezterm")
-
 local config = wezterm.config_builder()
 
+-- ============================================================================
+-- WSL Configuration
+-- ============================================================================
 config.wsl_domains = {
 	{
 		name = "WSL:Ubuntu",
@@ -9,7 +11,10 @@ config.wsl_domains = {
 	},
 }
 
-config.font = wezterm.font_with_fallback {
+-- ============================================================================
+-- Font Configuration
+-- ============================================================================
+local default_fonts = {
 	'Operator Mono Medium',
 	'Operator Mono Book',
 	'Operator Mono Bold',
@@ -17,26 +22,27 @@ config.font = wezterm.font_with_fallback {
 	'CaskaydiaCove Nerd Font',
 	'UnifontExMono',
 	'JuliaMono',
-	-- 'Berkeley Mono',
-	-- 'Iosevka Nerd Font',
 	{
 		family = 'Iosevka Nerd Font',
 		harfbuzz_features = { "liga", "calt", "ss03" },
 	},
 }
+
+config.font = wezterm.font_with_fallback(default_fonts)
 config.font_size = 12
 config.force_reverse_video_cursor = true
 
--- config.freetype_load_flags = "NO_HINTING"
--- config.enable_wayland = false
--- config.front_end = "OpenGL"
--- config.freetype_load_target = "HorizontalLcd"
+-- ============================================================================
+-- Display Settings
+-- ============================================================================
 config.max_fps = 120
 config.line_height = 1.0
-
 config.window_background_opacity = 1.00
 config.adjust_window_size_when_changing_font_size = false
 
+-- ============================================================================
+-- Key Bindings
+-- ============================================================================
 config.keys = {
 	-- Disable Ctrl-W so Neovim can use it for window commands
 	{
@@ -68,11 +74,13 @@ config.keys = {
 		mods = "CTRL",
 		action = wezterm.action.SendKey { key = "/", mods = "CTRL" },
 	},
+	-- Pass Ctrl+Space through to Neovim
 	{
 		key = ' ',
 		mods = 'CTRL',
 		action = wezterm.action.SendKey { key = ' ', mods = 'CTRL' },
 	},
+	-- Toggle pane zoom
 	{
 		key = 'z',
 		mods = 'CTRL',
@@ -80,13 +88,21 @@ config.keys = {
 	}
 }
 
+-- ============================================================================
+-- Platform-Specific Configuration
+-- ============================================================================
 if wezterm.target_triple == "x86_64-pc-windows-msvc" then
 	config.default_prog = { "C:/Program Files/Git/bin/bash.exe" }
 end
+
 config.audible_bell = "Disabled"
 
+-- ============================================================================
+-- Dynamic Font Switching (via Neovim font picker)
+-- ============================================================================
 wezterm.on("user-var-changed", function(window, pane, name, value)
 	local overrides = window:get_config_overrides() or {}
+
 	if name == "ZEN_MODE" then
 		local incremental = value:find("+")
 		local number_value = tonumber(value)
@@ -104,10 +120,28 @@ wezterm.on("user-var-changed", function(window, pane, name, value)
 			overrides.font_size = number_value
 			overrides.enable_tab_bar = false
 		end
+	elseif name == "WEZTERM_FONT" then
+		if value and value ~= "" and value ~= "RESET" then
+			-- Build new font list with selected font first, then fallback to defaults
+			local new_fallback = { value }
+			for _, font in ipairs(default_fonts) do
+				local font_name = type(font) == "string" and font or font.family
+				if font_name ~= value then
+					table.insert(new_fallback, font)
+				end
+			end
+			overrides.font = wezterm.font_with_fallback(new_fallback)
+		elseif value == "RESET" then
+			overrides.font = nil
+		end
 	end
+
 	window:set_config_overrides(overrides)
 end)
 
+-- ============================================================================
+-- Theme & Appearance Management
+-- ============================================================================
 local function get_appearance()
 	if wezterm.gui then
 		return wezterm.gui.get_appearance()
@@ -116,36 +150,36 @@ local function get_appearance()
 end
 
 local function scheme_for_appearance(appearance)
-	if appearance:find 'Dark' then
+	if appearance:find('Dark') then
 		return "Gruvbox dark, soft (base16)"
 	else
 		return "Gruvbox light, soft (base16)"
 	end
 end
 
+local function theme_for_appearance(appearance)
+	return appearance:find('Dark') and 'dark' or 'light'
+end
+
 local function update_appearance(window)
 	local appearance = get_appearance()
-	local theme = appearance:find('Dark') and 'dark' or 'light'
-	local scheme = scheme_for_appearance(appearance)
 	local overrides = window:get_config_overrides() or {}
-	overrides.color_scheme = scheme
+	overrides.color_scheme = scheme_for_appearance(appearance)
 	overrides.set_environment_variables = {
-	  NVIM_THEME = theme,
+		NVIM_THEME = theme_for_appearance(appearance),
 	}
 	window:set_config_overrides(overrides)
 end
 
+-- Update appearance on config reload and status refresh
 wezterm.on('window-config-reloaded', update_appearance)
-
--- Also update on status refresh to catch appearance changes
 wezterm.on('update-right-status', update_appearance)
 
--- Set NVIM_THEME environment variable for child processes (like Neovim)
+-- Set initial appearance
 local appearance = get_appearance()
 config.color_scheme = scheme_for_appearance(appearance)
-local theme = appearance:find('Dark') and 'dark' or 'light'
 config.set_environment_variables = {
-  NVIM_THEME = theme,
+	NVIM_THEME = theme_for_appearance(appearance),
 }
 
 return config

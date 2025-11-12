@@ -50,6 +50,12 @@ config.keys = {
 		mods = 'CTRL',
 		action = wezterm.action.DisableDefaultAssignment,
 	},
+
+	{
+		key = "Enter",
+		mods = "SHIFT",
+		action = wezterm.action { SendString = "\x1b\r" }
+	},
 	-- Use Ctrl-Shift-W to close the current pane/tab instead
 	{
 		key = 'w',

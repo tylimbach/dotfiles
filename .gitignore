@@ -39,3 +39,60 @@ luac.out
 *.x86_64
 *.hex
 
+# --- Dotfiles tool/config ignores ---
+# Alacritty
+alacritty/alacritty.toml.bak
+alacritty/*.swp
+alacritty/*.tmp
+alacritty/themes/*.bak
+
+# NuShell
+nushell/history.txt
+nushell/*.bak
+nushell/*.tmp
+nushell/*.swp
+
+# Neovim
+nvim/.netrwhist
+nvim/undo/
+nvim/backup/
+nvim/swap/
+nvim/.shada*
+nvim/lazy-lock.json
+nvim/lazyvim.json
+nvim/*.bak
+nvim/*.tmp
+nvim/*.swp
+
+# Yazi
+yazi/*.bak
+yazi/*.tmp
+yazi/*.swp
+yazi/cache/
+
+# Zed
+zed/*.bak
+zed/*.tmp
+zed/*.swp
+zed/prompts/
+
+# Zellij
+zellij/*.bak
+zellij/*.tmp
+zellij/*.swp
+zellij/session-*
+
+# OS/Editor junk
+.DS_Store
+Thumbs.db
+*.sublime-workspace
+*.sublime-project
+*.vscode/
+
+# General backup/swap
+*~
+*.swp
+*.swo
+*.tmp
+*.bak
+

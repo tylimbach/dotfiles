@@ -19,7 +19,8 @@ This repo contains my cross-platform dotfiles and configs for the tools I use ev
 
 - **macOS:** `brew install alacritty`
 - **Linux:** Use your distro's package manager (e.g. `sudo pacman -S alacritty` or `sudo apt install alacritty`)
-- **Windows:** `scoop install alacritty` or download from [releases](https://github.com/alacritty/alacritty/releases)
+- **Windows:** `winget install Alacritty.Alacritty` (recommended) or download from [releases](https://github.com/alacritty/alacritty/releases)
+  - If `winget` is unavailable, use `scoop install alacritty`
 
 **Config location:**
 
@@ -39,7 +40,8 @@ This repo contains my cross-platform dotfiles and configs for the tools I use ev
 
 - **macOS:** `brew install nushell`
 - **Linux:** `cargo install nu` or use your package manager
-- **Windows:** `scoop install nu`
+- **Windows:** `winget install Nushell.Nushell` (recommended)
+  - If `winget` is unavailable, use `scoop install nu`
 
 **Config location:**
 
@@ -59,7 +61,8 @@ This repo contains my cross-platform dotfiles and configs for the tools I use ev
 
 - **macOS:** `brew install neovim`
 - **Linux:** Use your package manager (e.g. `sudo pacman -S neovim`)
-- **Windows:** `scoop install neovim` or `choco install neovim`
+- **Windows:** `winget install Neovim.Neovim` (recommended)
+  - If `winget` is unavailable, use `scoop install neovim` or `choco install neovim`
 
 **Config location:**
 
@@ -79,7 +82,8 @@ This repo contains my cross-platform dotfiles and configs for the tools I use ev
 
 - **macOS:** `brew install yazi`
 - **Linux:** `cargo install yazi-fm`
-- **Windows:** `scoop install yazi`
+- **Windows:** `winget install yazi` (recommended)
+  - If `winget` is unavailable, use `scoop install yazi`
 
 **Config location:**
 
@@ -115,7 +119,8 @@ This repo contains my cross-platform dotfiles and configs for the tools I use ev
 
 - **macOS:** `brew install zellij`
 - **Linux:** `cargo install --locked zellij`
-- **Windows:** `scoop install zellij`
+- **Windows:** `winget install zellij` (recommended)
+  - If `winget` is unavailable, use `scoop install zellij`
 
 **Config location:**
 
@@ -130,14 +135,16 @@ This repo contains my cross-platform dotfiles and configs for the tools I use ev
 
 ## Copying Configs (Summary Table)
 
-| Tool      | macOS/Linux Config Dir | Windows Config Dir     | Copy from Repo             |
-| --------- | ---------------------- | ---------------------- | -------------------------- |
-| Alacritty | `~/.config/alacritty/` | `%APPDATA%\alacritty\` | `alacritty/alacritty.toml` |
-| NuShell   | `~/.config/nushell/`   | `%APPDATA%\nushell\`   | `nushell/*`                |
-| Neovim    | `~/.config/nvim/`      | `%LOCALAPPDATA%\nvim\` | `nvim/*`                   |
-| Yazi      | `~/.config/yazi/`      | `%APPDATA%\yazi\`      | `yazi/*`                   |
-| Zed       | `~/.config/zed/`       | `%APPDATA%\zed\`       | `zed/settings.json`        |
-| Zellij    | `~/.config/zellij/`    | `%APPDATA%\zellij\`    | `zellij/config.kdl`        |
+| Tool      | macOS/Linux Config Dir | Windows Config Dir       | Copy from Repo             |
+| --------- | ---------------------- | ------------------------ | -------------------------- |
+| Alacritty | `~/.config/alacritty/` | `%APPDATA%\\alacritty\\` | `alacritty/alacritty.toml` |
+| NuShell   | `~/.config/nushell/`   | `%APPDATA%\\nushell\\`   | `nushell/*`                |
+| Neovim    | `~/.config/nvim/`      | `%LOCALAPPDATA%\\nvim\\` | `nvim/*`                   |
+| Yazi      | `~/.config/yazi/`      | `%APPDATA%\\yazi\\`      | `yazi/*`                   |
+| Zed       | `~/.config/zed/`       | `%APPDATA%\\zed\\`       | `zed/settings.json`        |
+| Zellij    | `~/.config/zellij/`    | `%APPDATA%\\zellij\\`    | `zellij/config.kdl`        |
+
+_For Windows, prefer `winget` for installing tools. If unavailable, use `scoop` as a fallback._
 
 ---
 

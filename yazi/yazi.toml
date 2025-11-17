@@ -1,0 +1,7 @@
+[mgr]
+show_hidden = true
+sort_by = "natural"
+sort_sensitive = false
+sort_dir = "asc"
+ratio = [1, 4, 3]
+linemode = "size"

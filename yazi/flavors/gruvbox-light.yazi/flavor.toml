@@ -1,0 +1,102 @@
+# /Users/ty/.config/yazi/flavors/gruvbox-light.yazi/flavor.toml
+
+[mgr]
+cwd = { fg = "#3c3836", bg = "#fbf1c7", bold = true }
+hovered = { fg = "#fbf1c7", bg = "#3c3836" }
+preview_hovered = { fg = "#3c3836", bg = "#ebdbb2" }
+
+find_keyword = { fg = "#d65d0e", bg = "reset", bold = true }
+find_position = { fg = "#79740e", bg = "reset" }
+
+marker_copied = { fg = "#79740e", bg = "reset" }
+marker_cut = { fg = "#9d0006", bg = "reset" }
+marker_marked = { fg = "#076678", bg = "reset" }
+marker_selected = { fg = "#b57614", bg = "reset" }
+
+count_copied = { fg = "#79740e", bg = "reset" }
+count_cut = { fg = "#9d0006", bg = "reset" }
+count_selected = { fg = "#b57614", bg = "reset" }
+
+border_symbol = "│"
+border_style = { fg = "#d5c4a1", bg = "reset" }
+
+[tabs]
+active = { fg = "#fbf1c7", bg = "#3c3836", bold = true }
+inactive = { fg = "#3c3836", bg = "#ebdbb2" }
+sep_inner = { open = " ", close = " " }
+sep_outer = { open = " ", close = " " }
+
+[mode]
+normal_main = { fg = "#3c3836", bg = "#d5c4a1", bold = true }
+normal_alt = { fg = "#3c3836", bg = "#ebdbb2" }
+select_main = { fg = "#fbf1c7", bg = "#79740e", bold = true }
+select_alt = { fg = "#3c3836", bg = "#b8bb26" }
+unset_main = { fg = "#3c3836", bg = "#d5c4a1" }
+unset_alt = { fg = "#3c3836", bg = "#ebdbb2" }
+
+[status]
+overall = { fg = "#3c3836", bg = "#ebdbb2" }
+perm_type = { fg = "#b57614", bg = "reset" }
+perm_read = { fg = "#79740e", bg = "reset" }
+perm_write = { fg = "#d65d0e", bg = "reset" }
+perm_exec = { fg = "#79740e", bg = "reset" }
+perm_sep = { fg = "#a89984", bg = "reset" }
+progress_label = { fg = "#3c3836", bg = "#ebdbb2" }
+progress_normal = { fg = "#79740e", bg = "#ebdbb2" }
+progress_error = { fg = "#9d0006", bg = "#ebdbb2" }
+
+[which]
+cols = 2
+mask = { fg = "#fbf1c7", bg = "#3c3836" }
+cand = { fg = "#d65d0e", bg = "reset", bold = true }
+rest = { fg = "#3c3836", bg = "reset" }
+desc = { fg = "#79740e", bg = "reset" }
+separator = " -> "
+separator_style = { fg = "#a89984", bg = "reset" }
+
+[confirm]
+border = { fg = "#b57614", bg = "reset" }
+title = { fg = "#b57614", bg = "reset", bold = true }
+content = { fg = "#3c3836", bg = "reset" }
+list = { fg = "#3c3836", bg = "reset" }
+btn_yes = { fg = "#fbf1c7", bg = "#79740e", bold = true }
+btn_no = { fg = "#3c3836", bg = "#ebdbb2" }
+btn_labels = ["Yes", "No"]
+
+[notify]
+title_info = { fg = "#79740e", bg = "reset", bold = true }
+title_warn = { fg = "#d65d0e", bg = "reset", bold = true }
+title_error = { fg = "#9d0006", bg = "reset", bold = true }
+
+[pick]
+border = { fg = "#d5c4a1", bg = "reset" }
+active = { fg = "#fbf1c7", bg = "#3c3836", bold = true }
+inactive = { fg = "#3c3836", bg = "#ebdbb2" }
+
+[input]
+border = { fg = "#b57614", bg = "reset" }
+title = { fg = "#b57614", bg = "reset", bold = true }
+value = { fg = "#3c3836", bg = "reset" }
+selected = { fg = "#fbf1c7", bg = "#79740e", bold = true }
+
+[tasks]
+border = { fg = "#d5c4a1", bg = "reset" }
+title = { fg = "#b57614", bg = "reset", bold = true }
+hovered = { fg = "#fbf1c7", bg = "#3c3836" }
+
+[help]
+on = { fg = "#79740e", bg = "reset" }
+run = { fg = "#3c3836", bg = "reset" }
+desc = { fg = "#665c54", bg = "reset" }
+hovered = { fg = "#fbf1c7", bg = "#3c3836" }
+footer = { fg = "#a89984", bg = "reset" }
+
+[filetype]
+rules = [
+  { name = "*/", fg = "#79740e" },
+  { mime = "image/*", fg = "#076678" },
+  { mime = "video/*", fg = "#d65d0e" },
+  { mime = "audio/*", fg = "#b16286" },
+  { mime = "inode/empty", fg = "#a89984" },
+  { name = "*", is = "orphan", fg = "#9d0006" },
+]

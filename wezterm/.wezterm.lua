@@ -15,21 +15,21 @@ config.wsl_domains = {
 -- Font Configuration
 -- ============================================================================
 local default_fonts = {
-	'Operator Mono Medium',
-	'Operator Mono Book',
-	'Operator Mono Bold',
-	'Operator Mono Lig',
-	'CaskaydiaCove Nerd Font',
-	'UnifontExMono',
-	'JuliaMono',
-	{
-		family = 'Iosevka Nerd Font',
-		harfbuzz_features = { "liga", "calt", "ss03" },
-	},
+	"Operator Mono Medium",
+	"Operator Mono Book",
+	"Operator Mono Bold",
+	"Monaspace Krypton NF",
+	-- "CaskaydiaCove Nerd Font",
+	-- "UnifontExMono",
+	-- "JuliaMono",
+	-- {
+	-- 	family = "Iosevka Nerd Font",
+	-- 	harfbuzz_features = { "liga", "calt", "ss03" },
+	-- },
 }
 
 config.font = wezterm.font_with_fallback(default_fonts)
-config.font_size = 12
+config.font_size = 10
 config.force_reverse_video_cursor = true
 
 -- ============================================================================
@@ -46,21 +46,21 @@ config.adjust_window_size_when_changing_font_size = false
 config.keys = {
 	-- Disable Ctrl-W so Neovim can use it for window commands
 	{
-		key = 'w',
-		mods = 'CTRL',
+		key = "w",
+		mods = "CTRL",
 		action = wezterm.action.DisableDefaultAssignment,
 	},
 
 	{
 		key = "Enter",
 		mods = "SHIFT",
-		action = wezterm.action { SendString = "\x1b\r" }
+		action = wezterm.action({ SendString = "\x1b\r" }),
 	},
 	-- Use Ctrl-Shift-W to close the current pane/tab instead
 	{
-		key = 'w',
-		mods = 'CTRL|SHIFT',
-		action = wezterm.action.CloseCurrentPane { confirm = true },
+		key = "w",
+		mods = "CTRL|SHIFT",
+		action = wezterm.action.CloseCurrentPane({ confirm = true }),
 	},
 	-- Shift-Enter sends Escape+Enter (useful for some terminals)
 	{
@@ -78,28 +78,34 @@ config.keys = {
 	{
 		key = "/",
 		mods = "CTRL",
-		action = wezterm.action.SendKey { key = "/", mods = "CTRL" },
+		action = wezterm.action.SendKey({ key = "/", mods = "CTRL" }),
 	},
 	-- Pass Ctrl+Space through to Neovim
 	{
-		key = ' ',
-		mods = 'CTRL',
-		action = wezterm.action.SendKey { key = ' ', mods = 'CTRL' },
+		key = " ",
+		mods = "CTRL",
+		action = wezterm.action.SendKey({ key = " ", mods = "CTRL" }),
 	},
 	-- Toggle pane zoom
 	{
-		key = 'z',
-		mods = 'CTRL',
+		key = "z",
+		mods = "CTRL",
 		action = wezterm.action.TogglePaneZoomState,
-	}
+	},
+	{
+		key = "r",
+		mods = "CTRL|SHIFT",
+		action = wezterm.action.RotatePanes("Clockwise"),
+	},
 }
 
 -- ============================================================================
 -- Platform-Specific Configuration
 -- ============================================================================
-if wezterm.target_triple == "x86_64-pc-windows-msvc" then
-	config.default_prog = { "C:/Program Files/Git/bin/bash.exe" }
-end
+config.default_prog = { "nu" }
+-- if wezterm.target_triple == "x86_64-pc-windows-msvc" then
+-- 	config.default_prog = { "C:/Program Files/Git/bin/bash.exe" }
+-- end
 
 config.audible_bell = "Disabled"
 
@@ -152,11 +158,11 @@ local function get_appearance()
 	if wezterm.gui then
 		return wezterm.gui.get_appearance()
 	end
-	return 'Dark'
+	return "Dark"
 end
 
 local function scheme_for_appearance(appearance)
-	if appearance:find('Dark') then
+	if appearance:find("Dark") then
 		return "Gruvbox dark, soft (base16)"
 	else
 		return "Gruvbox light, soft (base16)"
@@ -164,7 +170,7 @@ local function scheme_for_appearance(appearance)
 end
 
 local function theme_for_appearance(appearance)
-	return appearance:find('Dark') and 'dark' or 'light'
+	return appearance:find("Dark") and "dark" or "light"
 end
 
 local function update_appearance(window)
@@ -178,8 +184,8 @@ local function update_appearance(window)
 end
 
 -- Update appearance on config reload and status refresh
-wezterm.on('window-config-reloaded', update_appearance)
-wezterm.on('update-right-status', update_appearance)
+wezterm.on("window-config-reloaded", update_appearance)
+wezterm.on("update-right-status", update_appearance)
 
 -- Set initial appearance
 local appearance = get_appearance()

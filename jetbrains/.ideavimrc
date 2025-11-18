@@ -1,51 +1,172 @@
-set relativenumber
+" IdeaVim configuration to match Neovim experience
+" Leader key
+let mapleader = " "
+let maplocalleader = "\\"
+
+" --- UI and options ---
 set number
-set incsearch
+set relativenumber
+set signcolumn=yes
+set scrolloff=8
+set ignorecase
+set smartcase
 set hlsearch
+set incsearch
+set expandtab!      " Use tabs (not spaces)
+set tabstop=4
+set shiftwidth=4
+set softtabstop=4
+set smartindent
+set wrap!           " Disable line wrap
+set splitright
+set splitbelow
+set clipboard+=unnamedplus
 
+" --- Window navigation ---
+nmap <C-h> <C-w>h
+nmap <C-j> <C-w>j
+nmap <C-k> <C-w>k
+nmap <C-l> <C-w>l
+nmap <C-Up> :resize +2<CR>
+nmap <C-Down> :resize -2<CR>
+nmap <C-Left> :vertical resize -2<CR>
+nmap <C-Right> :vertical resize +2<CR>
 
-nnoremap <Space> :action LeaderAction<cr>
-vnoremap <Space> :action LeaderAction<cr>
+" --- Indenting ---
+vmap < <gv
+vmap > >gv
 
-" move lines in visual
-vnoremap J :m '>+1<CR>gv=gv
-vnoremap K :m '<-2<CR>gv=gv
+" --- Move lines ---
+nmap <A-j> :m .+1<CR>==
+nmap <A-k> :m .-2<CR>==
+ivmap <A-j> <Esc>:m .+1<CR>==gi
+ivmap <A-k> <Esc>:m .-2<CR>==gi
+vmap <A-j> :m '>+1<CR>gv=gv
+vmap <A-k> :m '<-2<CR>gv=gv
 
-" join lines in normal
-nnoremap J mzJ`z
+" --- Clipboard ---
+nmap <leader>y "+y
+vmap <leader>y "+y
+nmap <leader>p "+p
+vmap <leader>p "+p
 
-" center on move
-"
-"nnoremap <C-d> <C-d>zz
-"nnoremap <C-u> <C-u>zz
-"nnoremap n nzzzv
-"nnoremap N Nzzzv
+" --- Search highlight ---
+nmap <Esc> :nohlsearch<CR>
 
-" clipboard ops
-xmap <leader>p [["_dP]]
-nmap <leader>y ["+y]
-vmap <leader>y ["+y]
-nmap <leader>Y ["+Y]
-nmap <leader>d [["_d]]
-vmap <leader>d [["_d]]
+" --- Paste without yanking ---
+vmap p "_dP
 
-" misc
-imap <C-c> <Esc>
+" --- Save and quit ---
+nmap <C-s> :w<CR>
+ivmap <C-s> <Esc>:w<CR>
+nmap <leader>qq :qa<CR>
 
-nnoremap Q <nop>
-nnoremap <C-f> :silent !tmux neww tmux-sessionizer<CR>
-nnoremap <leader>f :format<CR>
-nnoremap <C-k> :cnext<CR>zz
-nnoremap <C-j> :cprev<CR>zz
-nnoremap <leader>k :lnext<CR>zz
-nnoremap <leader>j :lprev<CR>zz
+" --- Buffer navigation ---
+nmap <S-h> :bprevious<CR>
+nmap <S-l> :bnext<CR>
+nmap <leader>bd :bdelete<CR>
+nmap <leader>bo :bufdo bdelete<CR>
+nmap <leader>ba :bufdo bdelete<CR>
 
-" search, replace, file ops
-nnoremap <leader>s :%s/\<<C-r><C-w>\>/<C-r><C-w>/gI<Left><Left><Left>
-nnoremap <leader>x :!chmod +x %<CR>
+" --- Tab navigation ---
+nmap <leader><tab>n :tabnew<CR>
+nmap <leader><tab>c :tabclose<CR>
+nmap <leader><tab>] :tabnext<CR>
+nmap <leader><tab>[ :tabprevious<CR>
+nmap <leader><tab>f :tabfirst<CR>
+nmap <leader><tab>l :tablast<CR>
 
-" IDE actions
-map <C-K> <Action>(ShowHoverInfo)
+" --- Quickfix/location navigation ---
+nmap ]q :cnext<CR>zv
+nmap [q :cprev<CR>zv
+nmap ]Q :clast<CR>zv
+nmap [Q :cfirst<CR>zv
+nmap ]l :lnext<CR>zv
+nmap [l :lprev<CR>zv
+nmap ]L :llast<CR>zv
+nmap [L :lfirst<CR>zv
 
-" disable current hlsearch
-nnoremap <esc> :noh<return><esc>
+" --- Buffer navigation ---
+nmap ]b :bnext<CR>
+nmap [b :bprevious<CR>
+nmap ]B :blast<CR>
+nmap [B :bfirst<CR>
+
+" --- File explorer (mini.files) ---
+nmap <leader>e :e .<CR>
+nmap <leader>o :e %<CR>
+
+" --- Fuzzy finders (mini.pick) ---
+nmap <leader><space> :action GotoFile<CR>
+nmap <leader>/ :action FindInPath<CR>
+nmap <leader>fb :action RecentFiles<CR>
+nmap <leader>fr :action RecentFiles<CR>
+nmap <leader>fh :action HelpTopics<CR>
+nmap <leader>fg :action FindInPath<CR>
+nmap <leader>fc :action ShowCommandLine<CR>
+nmap <leader>fl :action RecentFiles<CR>
+
+" --- Git pickers (mini.extra) ---
+nmap <leader>gB :action Git.Branches<CR>
+nmap <leader>gC :action Git.Log<CR>
+nmap <leader>gF :action Git.ShowFileHistory<CR>
+nmap <leader>gH :action Git.ShowDiff<CR>
+nmap <leader>gc :action Git.ShowFileHistory<CR>
+nmap <leader>gf :action Git.ShowFileHistory<CR>
+
+" --- Diagnostic pickers ---
+nmap <leader>sd :action ShowErrorsInProject<CR>
+nmap <leader>sD :action ShowErrorsInProject<CR>
+nmap <leader>se :action ShowErrorsInProject<CR>
+nmap <leader>sE :action ShowErrorsInProject<CR>
+nmap <leader>sw :action ShowWarningsInProject<CR>
+nmap <leader>sW :action ShowWarningsInProject<CR>
+
+" --- LSP navigation ---
+nmap gd :action GotoDeclaration<CR>
+nmap gD :action GotoDeclaration<CR>
+nmap gr :action FindUsages<CR>
+nmap gi :action GotoImplementation<CR>
+nmap gt :action GotoTypeDeclaration<CR>
+nmap K :action QuickDocumentation<CR>
+nmap <leader>ca :action ShowIntentionActions<CR>
+nmap <leader>cr :action RenameElement<CR>
+
+" --- Misc pickers ---
+nmap <leader>sk :action ShowKeymap<CR>
+nmap <leader>sc :action ShowCommandLine<CR>
+nmap <leader>sh :action ShowHighlightUsages<CR>
+nmap <leader>s: :action ShowCommandLine<CR>
+nmap <leader>s/ :action FindInPath<CR>
+nmap <leader>si :action ShowCommandLine<CR>
+
+" --- Undo tree ---
+nmap <leader>su :action LocalHistory<CR>
+
+" --- Git hunk navigation ---
+nmap ]h :action VcsShowNextChangeMarker<CR>
+nmap [h :action VcsShowPrevChangeMarker<CR>
+
+" --- Colorscheme picker ---
+nmap <leader>cc :action QuickChangeScheme<CR>
+
+" --- Buffer delete (mini.bufremove) ---
+nmap <leader>bx :action CloseEditor<CR>
+
+" --- File explorer picker ---
+nmap <leader>fE :action GotoFile<CR>
+nmap <leader>fe :action GotoFile<CR>
+nmap <leader>fv :action RecentFiles<CR>
+nmap <leader>fd :action GotoFile<CR>
+nmap <leader>fA :action GotoFile<CR>
+nmap <leader>fH :action GotoFile<CR>
+nmap <leader>fs :action ShowSpellChecker<CR>
+nmap <leader>fS :action LoadProject<CR>
+nmap <leader>fo :action ShowSettings<CR>
+nmap <leader>fm :action ShowManPage<CR>
+nmap <leader>fM :action ShowMacros<CR>
+nmap <leader>fR :action ShowRegisters<CR>
+
+" --- Window/tab pickers ---
+nmap <leader>sU :action ShowWindowList<CR>
+nmap <leader>sT :action ShowTabList<CR>

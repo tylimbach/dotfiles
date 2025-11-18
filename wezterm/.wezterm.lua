@@ -7,7 +7,7 @@ local config = wezterm.config_builder()
 config.wsl_domains = {
 	{
 		name = "WSL:Ubuntu",
-		distribution = "Ubuntu-22.04",
+		distribution = "Ubuntu-24.04",
 	},
 }
 
@@ -19,13 +19,6 @@ local default_fonts = {
 	"Operator Mono Book",
 	"Operator Mono Bold",
 	"Monaspace Krypton NF",
-	-- "CaskaydiaCove Nerd Font",
-	-- "UnifontExMono",
-	-- "JuliaMono",
-	-- {
-	-- 	family = "Iosevka Nerd Font",
-	-- 	harfbuzz_features = { "liga", "calt", "ss03" },
-	-- },
 }
 
 config.font = wezterm.font_with_fallback(default_fonts)
@@ -35,7 +28,6 @@ config.force_reverse_video_cursor = true
 -- ============================================================================
 -- Display Settings
 -- ============================================================================
-config.max_fps = 120
 config.line_height = 1.0
 config.window_background_opacity = 1.00
 config.adjust_window_size_when_changing_font_size = false
@@ -102,7 +94,7 @@ config.keys = {
 -- ============================================================================
 -- Platform-Specific Configuration
 -- ============================================================================
-config.default_prog = { "nu" }
+-- config.default_prog = { "nu" }
 -- if wezterm.target_triple == "x86_64-pc-windows-msvc" then
 -- 	config.default_prog = { "C:/Program Files/Git/bin/bash.exe" }
 -- end

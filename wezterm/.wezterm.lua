@@ -43,11 +43,6 @@ config.keys = {
 		action = wezterm.action.DisableDefaultAssignment,
 	},
 
-	{
-		key = "Enter",
-		mods = "SHIFT",
-		action = wezterm.action({ SendString = "\x1b\r" }),
-	},
 	-- Use Ctrl-Shift-W to close the current pane/tab instead
 	{
 		key = "w",
@@ -94,10 +89,11 @@ config.keys = {
 -- ============================================================================
 -- Platform-Specific Configuration
 -- ============================================================================
--- config.default_prog = { "nu" }
--- if wezterm.target_triple == "x86_64-pc-windows-msvc" then
--- 	config.default_prog = { "C:/Program Files/Git/bin/bash.exe" }
--- end
+if wezterm.target_triple == "x86_64-pc-windows-msvc" then
+	config.default_prog = { "pwsh" }
+else
+	config.default_prog = { "zsh", "-l" }
+end
 
 config.audible_bell = "Disabled"
 
@@ -107,22 +103,26 @@ config.audible_bell = "Disabled"
 wezterm.on("user-var-changed", function(window, pane, name, value)
 	local overrides = window:get_config_overrides() or {}
 
-	if name == "ZEN_MODE" then
-		local incremental = value:find("+")
-		local number_value = tonumber(value)
-		if incremental ~= nil then
-			while number_value > 0 do
+	if name == "ZEN_MODE" and value then
+		-- value can be like "+2" (increment), "-1" (reset), or "14" (set absolute)
+		local inc = value:match("^%%+(%d+)$")
+		if inc then
+			local n = tonumber(inc) or 1
+			for i = 1, n do
 				window:perform_action(wezterm.action.IncreaseFontSize, pane)
-				number_value = number_value - 1
 			end
 			overrides.enable_tab_bar = false
-		elseif number_value < 0 then
+		elseif value:match("^%-") then
+			-- any negative value resets
 			window:perform_action(wezterm.action.ResetFontSize, pane)
 			overrides.font_size = nil
 			overrides.enable_tab_bar = true
 		else
-			overrides.font_size = number_value
-			overrides.enable_tab_bar = false
+			local n = tonumber(value)
+			if n then
+				overrides.font_size = n
+				overrides.enable_tab_bar = false
+			end
 		end
 	elseif name == "WEZTERM_FONT" then
 		if value and value ~= "" and value ~= "RESET" then
@@ -154,7 +154,8 @@ local function get_appearance()
 end
 
 local function scheme_for_appearance(appearance)
-	if appearance:find("Dark") then
+	local a = appearance and appearance:lower() or ""
+	if a:find("dark") then
 		return "Gruvbox dark, soft (base16)"
 	else
 		return "Gruvbox light, soft (base16)"
@@ -162,28 +163,75 @@ local function scheme_for_appearance(appearance)
 end
 
 local function theme_for_appearance(appearance)
-	return appearance:find("Dark") and "dark" or "light"
+	local a = appearance and appearance:lower() or ""
+	return a:find("dark") and "dark" or "light"
 end
 
 local function update_appearance(window)
 	local appearance = get_appearance()
+	local new_scheme = scheme_for_appearance(appearance)
+	local new_theme = theme_for_appearance(appearance)
+
 	local overrides = window:get_config_overrides() or {}
-	overrides.color_scheme = scheme_for_appearance(appearance)
-	overrides.set_environment_variables = {
-		NVIM_THEME = theme_for_appearance(appearance),
-	}
+	-- if nothing to change for this window, skip work
+	if
+		overrides.color_scheme == new_scheme
+		and overrides.set_environment_variables
+		and overrides.set_environment_variables.NVIM_THEME == new_theme
+	then
+		return
+	end
+
+	overrides.color_scheme = new_scheme
+	local env = overrides.set_environment_variables or {}
+	env.NVIM_THEME = new_theme
+	overrides.set_environment_variables = env
+
 	window:set_config_overrides(overrides)
+
+	-- Force redraw of all panes
+	local mux = wezterm.mux
+	for _, win in ipairs(mux.get_windows()) do
+		for _, tab in ipairs(win:tabs()) do
+			for _, pane in ipairs(tab:panes()) do
+				pane:send_key({ key = "l", mods = "CTRL" })
+			end
+		end
+	end
 end
 
 -- Update appearance on config reload and status refresh
 wezterm.on("window-config-reloaded", update_appearance)
 wezterm.on("update-right-status", update_appearance)
+-- Also handle system appearance changes (Light/Dark) and force redraws
+wezterm.on("appearance_changed", function(appearance)
+	local theme = scheme_for_appearance(appearance)
+	local ntheme = theme_for_appearance(appearance)
+	for _, win in ipairs(wezterm.mux.get_windows()) do
+		local overrides = win:get_config_overrides() or {}
+		if
+			overrides.color_scheme ~= theme
+			or not (overrides.set_environment_variables and overrides.set_environment_variables.NVIM_THEME == ntheme)
+		then
+			overrides.color_scheme = theme
+			local env = overrides.set_environment_variables or {}
+			env.NVIM_THEME = ntheme
+			overrides.set_environment_variables = env
+			win:set_config_overrides(overrides)
+			-- force a redraw of panes in this window
+			for _, tab in ipairs(win:tabs()) do
+				for _, pane in ipairs(tab:panes()) do
+					pane:send_key({ key = "l", mods = "CTRL" })
+				end
+			end
+		end
+	end
+end)
 
 -- Set initial appearance
 local appearance = get_appearance()
 config.color_scheme = scheme_for_appearance(appearance)
-config.set_environment_variables = {
-	NVIM_THEME = theme_for_appearance(appearance),
-}
+config.set_environment_variables = config.set_environment_variables or {}
+config.set_environment_variables.NVIM_THEME = theme_for_appearance(appearance)
 
 return config

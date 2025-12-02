@@ -1,5 +1,6 @@
 local wezterm = require("wezterm")
 local config = wezterm.config_builder()
+local act = wezterm.action
 
 -- ============================================================================
 -- WSL Configuration
@@ -15,6 +16,7 @@ config.wsl_domains = {
 -- Font Configuration
 -- ============================================================================
 local default_fonts = {
+	"Lilex",
 	"Operator Mono Medium",
 	"Operator Mono Book",
 	"Operator Mono Bold",
@@ -36,6 +38,30 @@ config.adjust_window_size_when_changing_font_size = false
 -- Key Bindings
 -- ============================================================================
 config.keys = {
+	-- activate pane selection mode with the default alphabet (labels are "a", "s", "d", "f" and so on)
+	{
+		key = "0",
+		mods = "CTRL",
+		action = act.PaneSelect({
+			alphabet = "0123456789",
+		}),
+	},
+	{
+		key = "1",
+		mods = "CTRL",
+		action = act.PaneSelect({
+			mode = "SwapWithActive",
+			alphabet = "0123456789",
+		}),
+	},
+	{
+		key = "2",
+		mods = "CTRL",
+		action = act.PaneSelect({
+			mode = "MoveToNewTab",
+			alphabet = "0123456789",
+		}),
+	},
 	-- Disable Ctrl-W so Neovim can use it for window commands
 	{
 		key = "w",
@@ -90,7 +116,7 @@ config.keys = {
 -- Platform-Specific Configuration
 -- ============================================================================
 if wezterm.target_triple == "x86_64-pc-windows-msvc" then
-	config.default_prog = { "pwsh" }
+	config.default_prog = { "bash", "-l" }
 else
 	config.default_prog = { "zsh", "-l" }
 end

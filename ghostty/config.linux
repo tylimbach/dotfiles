@@ -1,0 +1,14 @@
+# =============================================================================
+# Linux-specific Ghostty configuration
+# =============================================================================
+
+# Single instance mode for faster subsequent launches
+gtk-single-instance = true
+
+# Use system decorations
+window-decoration = auto
+
+# Note: global: keybinds require a Wayland compositor with Global Shortcuts
+# portal support (KDE Plasma, GNOME 45+, Hyprland with config). Ubuntu 24.04
+# with GNOME should support this. If the quick terminal keybind doesn't work
+# globally, you may need to grant permissions or configure your DE.

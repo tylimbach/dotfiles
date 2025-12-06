@@ -1,0 +1,80 @@
+# =============================================================================
+# Ghostty Configuration
+# Cross-platform config for macOS and Linux
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Font Configuration
+# -----------------------------------------------------------------------------
+# Ghostty has built-in Nerd Font support, so we use the base font
+font-family = Lilex
+font-size = 10
+
+# -----------------------------------------------------------------------------
+# Theme - Auto light/dark switching based on system appearance
+# -----------------------------------------------------------------------------
+theme = light:Gruvbox Material Light,dark:Gruvbox Material Dark
+
+# -----------------------------------------------------------------------------
+# Shell & Environment
+# -----------------------------------------------------------------------------
+shell-integration = detect
+shell-integration-features = cursor,sudo,title
+
+# Set EDITOR for scrollback editing and general use
+env = EDITOR=nvim
+
+# -----------------------------------------------------------------------------
+# Window & Display
+# -----------------------------------------------------------------------------
+window-inherit-working-directory = true
+window-inherit-font-size = true
+mouse-hide-while-typing = true
+confirm-close-surface = true
+
+# Scrollback (~10MB, roughly equivalent to 10k+ lines)
+scrollback-limit = 10485760
+
+# -----------------------------------------------------------------------------
+# Clipboard
+# -----------------------------------------------------------------------------
+copy-on-select = true
+clipboard-trim-trailing-spaces = true
+
+# -----------------------------------------------------------------------------
+# Quick Terminal (Quake-style dropdown)
+# -----------------------------------------------------------------------------
+quick-terminal-position = top
+quick-terminal-autohide = true
+
+# -----------------------------------------------------------------------------
+# Keybindings
+# -----------------------------------------------------------------------------
+# Quit application
+keybind = ctrl+shift+w=quit
+
+# Toggle fullscreen (super = cmd on macOS, super on Linux)
+keybind = ctrl+super+f=toggle_fullscreen
+
+# Shift+Enter sends Escape+Return (useful for some TUI apps)
+keybind = shift+enter=text:\x1b\r
+
+# Font size controls
+keybind = ctrl+shift+equal=increase_font_size:1
+keybind = ctrl+minus=decrease_font_size:1
+keybind = ctrl+0=reset_font_size
+
+# Open scrollback in $EDITOR (nvim)
+keybind = ctrl+shift+e=write_scrollback_file:open
+
+# Quick terminal toggle (global on macOS)
+keybind = global:super+slash=toggle_quick_terminal
+
+# Disable Ctrl+W to let it pass through to Neovim/zellij
+keybind = ctrl+w=unbind
+
+# -----------------------------------------------------------------------------
+# Platform-specific includes (optional, ignored if file doesn't exist)
+# -----------------------------------------------------------------------------
+config-file = ?config.macos
+config-file = ?config.linux

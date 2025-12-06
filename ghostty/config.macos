@@ -1,0 +1,12 @@
+# =============================================================================
+# macOS-specific Ghostty configuration
+# =============================================================================
+
+# Treat Option key as Alt for terminal keybindings
+macos-option-as-alt = true
+
+# Titlebar style - transparent blends with terminal background
+macos-titlebar-style = transparent
+
+# Window shadow
+macos-window-shadow = true

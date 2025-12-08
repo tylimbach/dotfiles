@@ -1,0 +1,279 @@
+# Gruvbox LIGHT dircolors for WSL2
+# Optimized for light terminal backgrounds
+
+# Terminal types
+COLORTERM ?*
+TERM Eterm
+TERM ansi
+TERM *color*
+TERM con[0-9]*x[0-9]*
+TERM cons25
+TERM console
+TERM cygwin
+TERM *direct*
+TERM dtterm
+TERM gnome
+TERM hurd
+TERM jfbterm
+TERM konsole
+TERM kterm
+TERM linux
+TERM linux-c
+TERM mlterm
+TERM putty
+TERM rxvt*
+TERM screen*
+TERM st
+TERM terminator
+TERM tmux*
+TERM vt100
+TERM xterm*
+
+# Gruvbox Light palette (256-color):
+# bg:        230 (light cream)   fg:       237 (dark gray)
+# red:       88   green:    100  yellow:   136  blue:     24
+# purple:    96   aqua:     66   orange:   130  gray:     102
+
+# Basic file types
+RESET 0
+NORMAL 00
+FILE 00
+DIR 01;38;5;24                 # Bold blue (gruvbox light blue)
+LINK 01;38;5;66                # Bold aqua (gruvbox light aqua)
+MULTIHARDLINK 00
+FIFO 38;5;136;48;5;230         # Yellow on light bg
+SOCK 01;38;5;96                # Bold purple
+DOOR 01;38;5;96                # Bold purple
+BLK 38;5;136;48;5;230          # Yellow on light bg
+CHR 38;5;136;48;5;230          # Yellow on light bg
+ORPHAN 01;38;5;88              # Bold red (broken symlink)
+MISSING 01;38;5;88             # Bold red
+SETUID 38;5;230;48;5;88        # Light fg on red bg
+SETGID 38;5;230;48;5;136       # Light fg on yellow bg
+CAPABILITY 00
+
+# WSL2 FIX: Remove ugly backgrounds for Windows directories
+STICKY_OTHER_WRITABLE 01;38;5;24    # Bold blue (like normal dirs)
+OTHER_WRITABLE 01;38;5;24           # Bold blue (like normal dirs)
+STICKY 01;38;5;24                   # Bold blue (like normal dirs)
+
+# Executables - green
+EXEC 01;38;5;100
+
+# Archives - orange
+.tar 38;5;130
+.tgz 38;5;130
+.arc 38;5;130
+.arj 38;5;130
+.taz 38;5;130
+.lha 38;5;130
+.lz4 38;5;130
+.lzh 38;5;130
+.lzma 38;5;130
+.tlz 38;5;130
+.txz 38;5;130
+.tzo 38;5;130
+.t7z 38;5;130
+.zip 38;5;130
+.z 38;5;130
+.dz 38;5;130
+.gz 38;5;130
+.lrz 38;5;130
+.lz 38;5;130
+.lzo 38;5;130
+.xz 38;5;130
+.zst 38;5;130
+.tzst 38;5;130
+.bz2 38;5;130
+.bz 38;5;130
+.tbz 38;5;130
+.tbz2 38;5;130
+.tz 38;5;130
+.deb 38;5;130
+.rpm 38;5;130
+.jar 38;5;130
+.war 38;5;130
+.ear 38;5;130
+.sar 38;5;130
+.rar 38;5;130
+.alz 38;5;130
+.ace 38;5;130
+.zoo 38;5;130
+.cpio 38;5;130
+.7z 38;5;130
+.rz 38;5;130
+.cab 38;5;130
+.wim 38;5;130
+.swm 38;5;130
+.dwm 38;5;130
+.esd 38;5;130
+
+# Images - purple
+.avif 38;5;96
+.jpg 38;5;96
+.jpeg 38;5;96
+.mjpg 38;5;96
+.mjpeg 38;5;96
+.gif 38;5;96
+.bmp 38;5;96
+.pbm 38;5;96
+.pgm 38;5;96
+.ppm 38;5;96
+.tga 38;5;96
+.xbm 38;5;96
+.xpm 38;5;96
+.tif 38;5;96
+.tiff 38;5;96
+.png 38;5;96
+.svg 38;5;96
+.svgz 38;5;96
+.mng 38;5;96
+.pcx 38;5;96
+.ico 38;5;96
+.webp 38;5;96
+
+# Video - purple
+.mov 38;5;96
+.mpg 38;5;96
+.mpeg 38;5;96
+.m2v 38;5;96
+.mkv 38;5;96
+.webm 38;5;96
+.ogm 38;5;96
+.mp4 38;5;96
+.m4v 38;5;96
+.mp4v 38;5;96
+.vob 38;5;96
+.qt 38;5;96
+.nuv 38;5;96
+.wmv 38;5;96
+.asf 38;5;96
+.rm 38;5;96
+.rmvb 38;5;96
+.flc 38;5;96
+.avi 38;5;96
+.fli 38;5;96
+.flv 38;5;96
+.gl 38;5;96
+.dl 38;5;96
+.xcf 38;5;96
+.xwd 38;5;96
+.yuv 38;5;96
+.cgm 38;5;96
+.emf 38;5;96
+.ogv 38;5;96
+.ogx 38;5;96
+
+# Audio - aqua
+.aac 38;5;66
+.au 38;5;66
+.flac 38;5;66
+.m4a 38;5;66
+.mid 38;5;66
+.midi 38;5;66
+.mka 38;5;66
+.mp3 38;5;66
+.mpc 38;5;66
+.ogg 38;5;66
+.ra 38;5;66
+.wav 38;5;66
+.oga 38;5;66
+.opus 38;5;66
+.spx 38;5;66
+.xspf 38;5;66
+
+# Documents - yellow
+.pdf 38;5;136
+.doc 38;5;136
+.docx 38;5;136
+.odt 38;5;136
+.xls 38;5;136
+.xlsx 38;5;136
+.ppt 38;5;136
+.pptx 38;5;136
+.md 38;5;136
+.txt 38;5;237
+.rst 38;5;136
+
+# Source code - green
+.c 38;5;100
+.cpp 38;5;100
+.cc 38;5;100
+.h 38;5;100
+.hpp 38;5;100
+.go 38;5;100
+.rs 38;5;100
+.py 38;5;100
+.rb 38;5;100
+.pl 38;5;100
+.sh 38;5;100
+.bash 38;5;100
+.zsh 38;5;100
+.fish 38;5;100
+.vim 38;5;100
+.lua 38;5;100
+.java 38;5;100
+.scala 38;5;100
+.kt 38;5;100
+.clj 38;5;100
+.hs 38;5;100
+.ml 38;5;100
+.el 38;5;100
+.lisp 38;5;100
+.scm 38;5;100
+.sql 38;5;100
+
+# Web - yellow/aqua/blue
+.html 38;5;136
+.htm 38;5;136
+.css 38;5;66
+.scss 38;5;66
+.sass 38;5;66
+.less 38;5;66
+.js 38;5;136
+.jsx 38;5;136
+.ts 38;5;24
+.tsx 38;5;24
+.vue 38;5;100
+.svelte 38;5;130
+.json 38;5;136
+.jsonc 38;5;136
+.yaml 38;5;136
+.yml 38;5;136
+.toml 38;5;136
+.xml 38;5;136
+
+# Config files - gray
+.conf 38;5;102
+.config 38;5;102
+.cfg 38;5;102
+.ini 38;5;102
+.env 38;5;102
+.gitignore 38;5;102
+.gitattributes 38;5;102
+.dockerignore 38;5;102
+.editorconfig 38;5;102
+
+# Backup/temp files - lighter gray (visible on light bg)
+*~ 38;5;246
+*# 38;5;246
+.bak 38;5;246
+.old 38;5;246
+.orig 38;5;246
+.swp 38;5;246
+.tmp 38;5;246
+.temp 38;5;246
+.log 38;5;246
+.part 38;5;246
+.crdownload 38;5;246
+.dpkg-dist 38;5;246
+.dpkg-new 38;5;246
+.dpkg-old 38;5;246
+.dpkg-tmp 38;5;246
+.rej 38;5;246
+.rpmnew 38;5;246
+.rpmorig 38;5;246
+.rpmsave 38;5;246
+.ucf-dist 38;5;246
+.ucf-new 38;5;246
+.ucf-old 38;5;246

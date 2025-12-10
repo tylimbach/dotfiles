@@ -2,6 +2,15 @@
 export EDITOR=nvim
 export VISUAL=nvim
 
+# Use emacs-style line editing (prevents vi-mode backspace issues)
+# Note: EDITOR=nvim causes zsh to default to vi-mode, which has different
+# backspace behavior (stops at insert point). This forces emacs mode.
+bindkey -e
+
+# Explicit backspace bindings (ensures consistency across terminals)
+bindkey '^?' backward-delete-char  # DEL (0x7f) - most terminals
+bindkey '^H' backward-delete-char  # BS (0x08) - some terminals
+
 # Word navigation with Alt/Option + Arrow keys
 # Covers: Alacritty, WezTerm, Ghostty, iTerm2, Windows Terminal
 # Forward word
@@ -33,14 +42,50 @@ setopt share_history
 
 # Load modules & functions
 zmodload zsh/complist 2>/dev/null || true
-autoload -Uz compinit vcs_info add-zsh-hook
+autoload -Uz compinit add-zsh-hook
 
-# Fast, cached completion init (important on Windows/MSYS)
+# ============================================================
+# Completion setup (must run before compinit)
+# ============================================================
+
+# Add Homebrew completions to fpath (platform-specific)
+if [[ -d /home/linuxbrew/.linuxbrew/share/zsh/site-functions ]]; then
+    fpath=(/home/linuxbrew/.linuxbrew/share/zsh/site-functions $fpath)
+elif [[ -d /opt/homebrew/share/zsh/site-functions ]]; then
+    fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
+fi
+
+# Generate completions for tools that support it (cached in fpath)
+# Uses a marker file to skip checks entirely on subsequent shells
+_completion_cache="${ZDOTDIR:-$HOME}/.zsh/completions"
+[[ -d "$_completion_cache" ]] || mkdir -p "$_completion_cache"
+fpath=("$_completion_cache" $fpath)
+
+# Only check for missing completions if marker is missing or old (once per day)
+if [[ ! -f "$_completion_cache/.generated" ]] || [[ -z "$(find "$_completion_cache/.generated" -mtime 0 2>/dev/null)" ]]; then
+    () {
+        [[ ! -f "$_completion_cache/_rustup" ]] && command -v rustup &>/dev/null && \
+            rustup completions zsh > "$_completion_cache/_rustup" 2>/dev/null
+        [[ ! -f "$_completion_cache/_cargo" ]] && command -v rustup &>/dev/null && \
+            rustup completions zsh cargo > "$_completion_cache/_cargo" 2>/dev/null
+        [[ ! -f "$_completion_cache/_gh" ]] && command -v gh &>/dev/null && \
+            gh completion -s zsh > "$_completion_cache/_gh" 2>/dev/null
+        [[ ! -f "$_completion_cache/_docker" ]] && command -v docker &>/dev/null && \
+            docker completion zsh > "$_completion_cache/_docker" 2>/dev/null
+        [[ ! -f "$_completion_cache/_kubectl" ]] && command -v kubectl &>/dev/null && \
+            kubectl completion zsh > "$_completion_cache/_kubectl" 2>/dev/null
+        touch "$_completion_cache/.generated"
+    }
+fi
+
+# Fast, cached completion init
+# -C skips security check (faster), regenerate with: rm ~/.zcompdump; compinit
 COMPDUMP="${ZDOTDIR:-$HOME}/.zcompdump"
-if [[ ! -f $COMPDUMP ]]; then
-    compinit -d "$COMPDUMP"
-else
+# Check if dump exists and is less than 24 hours old (portable)
+if [[ -f "$COMPDUMP" ]] && [[ -n "$(find "$COMPDUMP" -mtime 0 2>/dev/null)" ]]; then
     compinit -C -d "$COMPDUMP"
+else
+    compinit -d "$COMPDUMP"
 fi
 
 # Plugins (install via git clone into $ZDOTDIR/plugins/)
@@ -56,8 +101,21 @@ if [ -f "${ZDOTDIR:-$HOME/.config/zsh}/plugins/zsh-syntax-highlighting/zsh-synta
 fi
 
 # Git info for prompt
-zstyle ':vcs_info:*' enable git
-zstyle ':vcs_info:git*' formats '(%b)'
+# Note: vcs_info fails for Windows worktrees accessed from WSL because the
+# .git file contains Windows paths. We use a custom function that detects
+# the filesystem and uses git.exe for /mnt/c paths.
+_git_branch_info() {
+    local git_cmd="git"
+    # Use git.exe for Windows filesystem (worktrees have Windows paths)
+    [[ "$PWD" == /mnt/[a-z]/* ]] && git_cmd="git.exe"
+    
+    # Fast path: check for .git directory/file before spawning process
+    [[ -e .git ]] || $git_cmd rev-parse --git-dir &>/dev/null || return
+    
+    local branch
+    branch=$($git_cmd rev-parse --abbrev-ref HEAD 2>/dev/null)
+    [[ -n "$branch" ]] && echo "($branch)"
+}
 
 # ============================================================
 # Platform detection (run once at startup)
@@ -122,13 +180,17 @@ if [[ "$_OS" == "mingw" ]]; then
     export PATH
 fi
 
+if [[ "$_OS" == "wsl" ]]; then
+	hash -d "w"="/mnt/c/Users/tlimbach"
+fi
+
 # Prompt
 _prompt_precmd() {
-    vcs_info
+    local git_info=$(_git_branch_info)
     local ts="%D{%H:%M:%S}"
     local os_indicator=""
     [[ "$_OS" == "wsl" ]] && os_indicator="%F{magenta}[WSL]%f "
-    PS1="${os_indicator}%F{green}${ts}%f %F{cyan}%n%f@%F{blue}%m%f %F{yellow}%~%f ${vcs_info_msg_0_}
+    PS1="${os_indicator}%F{green}${ts}%f %F{cyan}%n%f@%F{blue}%m%f %F{yellow}%~%f ${git_info}
 $ "
 }
 
@@ -214,18 +276,19 @@ light() {
 }
 
 # Detect current theme on shell startup and load appropriate LS_COLORS
+# Reads NVIM_THEME from alacritty config to avoid grepping entire file
 _detect_theme() {
+    local theme="dark"
+    
     if [[ -f "$ALACRITTY_CONFIG/alacritty.toml" ]]; then
-        if grep -q 'background = "0x282828"' "$ALACRITTY_CONFIG/alacritty.toml" 2>/dev/null; then
-            _load_ls_colors dark
-            export NVIM_THEME="dark"
-        else
-            _load_ls_colors light
-            export NVIM_THEME="light"
-        fi
-    else
-        _load_ls_colors dark
+        # Extract NVIM_THEME value from config (fast: stops at first match)
+        local detected
+        detected=$(sed -n 's/^NVIM_THEME *= *"\([^"]*\)".*/\1/p' "$ALACRITTY_CONFIG/alacritty.toml" 2>/dev/null | head -1)
+        [[ -n "$detected" ]] && theme="$detected"
     fi
+    
+    _load_ls_colors "$theme"
+    export NVIM_THEME="$theme"
 }
 _detect_theme
 
@@ -234,3 +297,13 @@ _detect_theme
 # ============================================================
 # WSL needs explicit color flag; macOS/mingw handle it natively
 [[ "$_OS" == "wsl" || "$_OS" == "linux" ]] && alias ls='ls --color=auto'
+
+# ============================================================
+# WSL .exe completions (reuse WSL tool completions for Windows binaries)
+# ============================================================
+if [[ "$_OS" == "wsl" ]]; then
+    # git.exe uses same completions as git
+    compdef git.exe=git 2>/dev/null
+    # nvim.exe uses same completions as nvim  
+    compdef nvim.exe=nvim 2>/dev/null
+fi

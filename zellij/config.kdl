@@ -45,9 +45,10 @@ keybinds clear-defaults=true {
                 floating true
                 move_to_focused_tab true
                 cwd "/"
-                root_dirs "$HOME/dev"
+                root_dirs "~/dev;/mnt/c/Users/tlimbach/dev"
                 session_layout "dev"
-            }
+            }; 
+			SwitchToMode "Locked";
         }
 
         // Quit

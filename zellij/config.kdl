@@ -364,3 +364,4 @@ default_mode "locked"
 default_shell "zsh"
 default_layout "compact"
 pane_frames false
+mouse_mode false  // Prevents escape sequences breaking Windows .exe TUIs in WSL

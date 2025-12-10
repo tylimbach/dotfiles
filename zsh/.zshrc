@@ -299,11 +299,15 @@ _detect_theme
 [[ "$_OS" == "wsl" || "$_OS" == "linux" ]] && alias ls='ls --color=auto'
 
 # ============================================================
-# WSL .exe completions (reuse WSL tool completions for Windows binaries)
+# WSL .exe completions
 # ============================================================
+# Note: git.exe completions are intentionally NOT set up here.
+# The _git completion function calls `git` internally to query branches,
+# remotes, etc. Using WSL git on Windows filesystem is ~7x slower than
+# git.exe, making completions painfully slow. Better to use basic file
+# completion than wait 800ms+ per tab press.
+#
+# nvim.exe completions work fine since _nvim only completes filenames.
 if [[ "$_OS" == "wsl" ]]; then
-    # git.exe uses same completions as git
-    compdef git.exe=git 2>/dev/null
-    # nvim.exe uses same completions as nvim  
     compdef nvim.exe=nvim 2>/dev/null
 fi

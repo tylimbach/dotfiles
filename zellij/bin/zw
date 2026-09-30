@@ -104,14 +104,23 @@ def add(name):
     return path
 
 
+def attached():
+    """Exit unless this shell can drive its zellij session."""
+    if "ZELLIJ" not in os.environ:
+        sys.exit("Not in zellij.")
+    if not live():
+        sys.exit(f"This pane's zellij session, {os.environ.get('ZELLIJ_SESSION_NAME')!r}, isn't "
+                 "running: renamed since the pane opened? Retry from a new pane.")
+
+
 def new(name, args):
     path = add(name)
-    if "ZELLIJ" not in os.environ:
-        sys.exit(f"Not in zellij: cd {path}")
+    attached()
     if go(name):
         return
     agent = ["codex", *[a for a in args if a != "--codex"]] if "--codex" in args else ["claude", *args]
-    zellij("new-tab", "--layout-string", layout(name, path, agent))
+    if zellij("new-tab", "--layout-string", layout(name, path, agent)) is None:
+        sys.exit("zellij couldn't open the tab.")
 
 
 def kdl(text):
@@ -202,6 +211,7 @@ def main():
     elif command == "add" and len(rest) == 1:
         add(rest[0])
     elif command == "go" and len(rest) == 1:
+        attached()
         go(rest[0]) or sys.exit(f"No tab named {rest[0]}.")
     elif command == "ls":
         ls()

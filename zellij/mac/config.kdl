@@ -38,14 +38,13 @@ keybinds clear-defaults=true {
         bind "Alt x" { TogglePaneFrames; }
 
         // Sessionizer - project picker (Alt+/)
-        // Build: cd ~/dev/zellij-sessionizer && cargo build --release
-        //        cp target/wasm32-wasip1/release/zellij-sessionizer.wasm ~/AppData/Roaming/zellij/config/plugins/
+        // Install: see README.md (release .wasm into ~/.config/zellij/plugins/)
         // Keys: type to fuzzy-search, Up/Down or Ctrl+n/p to navigate, Enter to open, Esc to close, Ctrl+r to refresh
         bind "Alt /" {
-            LaunchOrFocusPlugin "file:~/AppData/Roaming/zellij/config/plugins/zellij-sessionizer.wasm" {
+            LaunchOrFocusPlugin "file:~/.config/zellij/plugins/zellij-sessionizer.wasm" {
                 floating true
                 move_to_focused_tab true
-                roots "~/dev;~/AppData/Local"
+                roots "~/dev"
                 git_only "true"
                 layout "default"
             };

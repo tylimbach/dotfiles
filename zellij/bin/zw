@@ -129,12 +129,14 @@ def kdl(text):
 
 def layout(name, path, agent):
     """The agent full-size, a hidden floating shell (Alt+w). A layout-made
-    tab gets no bar from the session's template, so it brings its own."""
+    tab gets no bars from the session's template, so it brings zellij's
+    default ones."""
     args = f" {{ args {' '.join(kdl(a) for a in agent[1:])}; }}" if agent[1:] else ""
     return f"""layout {{
   tab name={kdl(name)} cwd={kdl(path)} hide_floating_panes=true {{
+    pane size=1 borderless=true {{ plugin location="tab-bar"; }}
     pane command={kdl(agent[0])}{args}
-    pane size=1 borderless=true {{ plugin location="compact-bar"; }}
+    pane size=2 borderless=true {{ plugin location="status-bar"; }}
     floating_panes {{ pane; }}
   }}
 }}"""

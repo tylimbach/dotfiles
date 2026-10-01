@@ -143,6 +143,7 @@ This repo contains my cross-platform dotfiles and configs for the tools I use ev
 | Yazi      | `~/.config/yazi/`      | `%APPDATA%\\yazi\\`      | `yazi/*`                   |
 | Zed       | `~/.config/zed/`       | `%APPDATA%\\zed\\`       | `zed/settings.json`        |
 | Zellij    | `~/.config/zellij/`    | `%APPDATA%\\zellij\\`    | `zellij/config.kdl`        |
+| sccache   | `~/Library/Application Support/Mozilla.sccache/` (macOS), `~/.config/sccache/` (Linux) | `%APPDATA%\\Mozilla\\sccache\\config\\` | `sccache/config` |
 
 _For Windows, prefer `winget` for installing tools. If unavailable, use `scoop` as a fallback._
 

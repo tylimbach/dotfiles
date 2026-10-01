@@ -1,0 +1,4 @@
+# sccache: the Rust build cache every checkout and worktree shares.
+# The 10 GiB default evicts Bevy between worktrees and toolchain bumps.
+[cache.disk]
+size = 53687091200  # 50 GiB

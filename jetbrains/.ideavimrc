@@ -502,6 +502,15 @@ inoremap <C-W> <C-G>u<C-W>
 nnoremap Q @@
 " There are several more Neovim mappings that need to be ported.  See link.
 
+" Completion keymaps (match blink.cmp default preset in Neovim)
+" <C-y> accepts the selected completion item (replaces Vim's default 'copy char above')
+imap <C-y> <Action>(EditorChooseLookupItem)
+" <C-n> / <C-p> navigate the completion list
+imap <C-n> <Action>(EditorDownInLookupList)
+imap <C-p> <Action>(EditorUpInLookupList)
+" <C-e> dismisses the completion popup
+imap <C-e> <Action>(EditorEscape)
+
 " Jetbrains conflicts
 " https://github.com/JetBrains/ideavim/blob/master/doc/sethandler.md
 " None, yet.  Possible conflicts: ctrl -6befhjklorsvw

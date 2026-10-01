@@ -7,7 +7,8 @@ branch"). Inside zellij, each gets a tab named NAME running the agent, with a
 hidden floating shell in the worktree (Alt+w).
 
   zw new NAME [--codex] [ARGS...]  worktree + tab + agent (ARGS go to the agent);
-                                   an existing NAME just gets its tab back
+                                   an existing NAME gets its tab back, or a new one
+                                   in its worktree (`zw new NAME -c` resumes there)
   zw add NAME                      worktree only
   zw go NAME                       focus NAME's tab
   zw ls                            worktrees: branch, commits ahead, uncommitted files
@@ -89,18 +90,25 @@ def worktrees():
 
 
 def target(name):
-    main, _ = worktrees()[0]
-    return os.path.join(os.path.dirname(main), f"{os.path.basename(main)}-{name}")
+    """NAME's worktree and branch: an existing one, zw's (agent/NAME) or
+    Claude Code's (worktree-NAME, under .claude/worktrees), else where zw
+    makes it."""
+    trees = worktrees()
+    for path, branch in trees[1:]:
+        if name in (branch, os.path.basename(path)) or branch in (f"agent/{name}", f"worktree-{name}"):
+            return path, branch
+    main = trees[0][0]
+    return os.path.join(os.path.dirname(main), f"{os.path.basename(main)}-{name}"), f"agent/{name}"
 
 
 def add(name):
     main, active = worktrees()[0]
-    path = target(name)
+    path, branch = target(name)
     if os.path.isdir(path):
         return path
-    if not run("git", "worktree", "add", "-b", f"agent/{name}", path, active, cwd=main):
+    if not run("git", "worktree", "add", "-b", branch, path, active, cwd=main):
         sys.exit(1)
-    print(f"agent/{name} from {active}, in {path}", flush=True)
+    print(f"{branch} from {active}, in {path}", flush=True)
     return path
 
 
@@ -174,7 +182,7 @@ def land(check):
 
 def done(name):
     main, active = worktrees()[0]
-    path, branch = target(name), f"agent/{name}"
+    path, branch = target(name)
     if os.path.isdir(path):
         if git("status", "--porcelain", cwd=path):
             sys.exit(f"{path} has uncommitted changes.")

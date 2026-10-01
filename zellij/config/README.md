@@ -68,6 +68,7 @@ per project. Worktrees sit next to the main checkout as `../<repo>-NAME` on
 | Command | Does |
 |------|--------|
 | `zw new NAME [--codex] [ARGS]` | Worktree + tab: the agent full-size, a hidden shell there (Alt+w) |
+| `zw new NAME -c` | Reopen an existing worktree (zw's or Claude Code's `.claude/worktrees/NAME`), resuming its last session |
 | `zw go NAME` | Focus NAME's tab |
 | `zw ls` | Worktrees: branch, commits ahead, uncommitted files |
 | `zw land [CHECK...]` | From a worktree: rebase, run CHECK, fast-forward the active branch |

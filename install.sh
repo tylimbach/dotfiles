@@ -32,7 +32,7 @@ link() {
 link zsh/.zshrc "$HOME/.zshrc"
 link zellij/bin/zw "$HOME/.local/bin/zw"
 link claude/statusline-command.sh "$HOME/.claude/statusline-command.sh"
-link claude/agents "$HOME/.claude/agents"
+for agent in claude/agents/*.md; do link "$agent" "$HOME/.claude/agents/${agent##*/}"; done
 case $OS in
     macos)
         link zellij/mac/config.kdl "$HOME/.config/zellij/config.kdl"

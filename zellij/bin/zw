@@ -95,11 +95,13 @@ def target(name):
     Claude Code's (worktree-NAME, under .claude/worktrees), else where zw
     makes it."""
     trees = worktrees()
-    for path, branch in trees[1:]:
-        if name in (branch, os.path.basename(path)) or branch in (f"agent/{name}", f"worktree-{name}"):
-            return path, branch
     main = trees[0][0]
-    return os.path.join(os.path.dirname(main), f"{os.path.basename(main)}-{name}"), f"agent/{name}"
+    folder = f"{os.path.basename(main)}-{name}"
+    for path, branch in trees[1:]:
+        if (name == branch or os.path.basename(path) in (name, folder)
+                or branch in (f"agent/{name}", f"worktree-{name}")):
+            return path, branch
+    return os.path.join(os.path.dirname(main), folder), f"agent/{name}"
 
 
 def base(branch, cwd=None):

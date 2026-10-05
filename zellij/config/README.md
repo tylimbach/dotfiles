@@ -63,7 +63,8 @@ All modes support:
 
 `bin/zw` gives each git worktree its own tab and agent, within one session
 per project. Worktrees sit next to the main checkout as `../<repo>-NAME` on
-`agent/NAME`, branched from the main checkout's current branch.
+`agent/NAME`, branched from the checkout `zw` runs in, which becomes the
+branch's upstream. So a story's worktree can branch tasks that land back into it.
 
 | Command | Does |
 |------|--------|
@@ -71,7 +72,7 @@ per project. Worktrees sit next to the main checkout as `../<repo>-NAME` on
 | `zw new NAME -c` | Reopen an existing worktree (zw's or Claude Code's `.claude/worktrees/NAME`), resuming its last session |
 | `zw go NAME` | Focus NAME's tab |
 | `zw ls` | Worktrees: branch, commits ahead, uncommitted files |
-| `zw land [CHECK...]` | From a worktree: rebase, run CHECK, fast-forward the active branch |
+| `zw land [CHECK...]` | From a worktree: rebase onto its upstream, run CHECK, fast-forward it |
 | `zw done NAME` | Once landed: close the tab, remove the worktree and branch |
 
 Agent hooks mark each tab: `●` working, `?` needs you, `✓` finished.

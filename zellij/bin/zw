@@ -2,8 +2,9 @@
 """zw: one zellij tab per git worktree, each with its own agent.
 
 Worktrees live next to the main checkout as ../<repo>-NAME on branch
-agent/NAME, branched from the main checkout's current branch (the "active
-branch"). Inside zellij, each gets a tab named NAME running the agent, with a
+agent/NAME, branched from the checkout zw runs in, which becomes the branch's
+upstream (its "base"), so a story's worktree can branch its own tasks.
+Inside zellij, each gets a tab named NAME running the agent, with a
 hidden floating shell in the worktree (Alt+w).
 
   zw new NAME [--codex] [ARGS...]  worktree + tab + agent (ARGS go to the agent);
@@ -12,7 +13,7 @@ hidden floating shell in the worktree (Alt+w).
   zw add NAME                      worktree only
   zw go NAME                       focus NAME's tab
   zw ls                            worktrees: branch, commits ahead, uncommitted files
-  zw land [CHECK...]               from a worktree: rebase onto the active branch,
+  zw land [CHECK...]               from a worktree: rebase onto its base,
                                    run CHECK (e.g. `just check`), fast-forward it
   zw done NAME                     once landed: close the tab, remove worktree and branch
   zw status working|input|done|clear
@@ -29,7 +30,7 @@ MARK_RE = re.compile(r" [●?✓]$")
 
 
 def git(*args, cwd=None):
-    out = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    out = subprocess.run(["git", *args], cwd=cwd, capture_output=True, encoding="utf-8")
     return out.stdout.rstrip() if out.returncode == 0 else ""
 
 
@@ -41,7 +42,7 @@ def live():
     """This shell's zellij session is running. A renamed session keeps its
     old name in ZELLIJ_SESSION_NAME, and actions sent there hang."""
     out = subprocess.run(["zellij", "list-sessions", "--no-formatting"],
-                         capture_output=True, text=True).stdout
+                         capture_output=True, encoding="utf-8").stdout
     alive = {line.split()[0] for line in out.splitlines() if line and "EXITED" not in line}
     return os.environ.get("ZELLIJ_SESSION_NAME") in alive
 
@@ -51,7 +52,7 @@ def zellij(*args, capture=False):
     if "ZELLIJ" not in os.environ or not live():
         return None
     try:
-        out = subprocess.run(["zellij", "action", *args], capture_output=True, text=True,
+        out = subprocess.run(["zellij", "action", *args], capture_output=True, encoding="utf-8",
                              timeout=3, stdin=subprocess.DEVNULL)
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return None
@@ -101,14 +102,23 @@ def target(name):
     return os.path.join(os.path.dirname(main), f"{os.path.basename(main)}-{name}"), f"agent/{name}"
 
 
+def base(branch, cwd=None):
+    """The local branch BRANCH lands into: its upstream, else the main
+    checkout's branch (worktrees made before zw recorded one)."""
+    ref = git("for-each-ref", "--format=%(upstream)", f"refs/heads/{branch}", cwd=cwd)
+    return ref[len("refs/heads/"):] if ref.startswith("refs/heads/") else worktrees()[0][1]
+
+
 def add(name):
-    main, active = worktrees()[0]
+    main = worktrees()[0][0]
     path, branch = target(name)
     if os.path.isdir(path):
         return path
-    if not run("git", "worktree", "add", "-b", branch, path, active, cwd=main):
+    here = git("branch", "--show-current") or worktrees()[0][1]
+    if not run("git", "worktree", "add", "-b", branch, path, here, cwd=main):
         sys.exit(1)
-    print(f"{branch} from {active}, in {path}", flush=True)
+    git("branch", f"--set-upstream-to={here}", branch, cwd=main)
+    print(f"{branch} from {here}, in {path}", flush=True)
     return path
 
 
@@ -151,43 +161,44 @@ def layout(name, path, agent):
 
 
 def ls():
-    trees = worktrees()
-    _, active = trees[0]
-    for path, branch in trees:
-        ahead = git("rev-list", "--count", f"{active}..{branch}", cwd=path) if branch != active else ""
+    for path, branch in worktrees():
+        onto = base(branch, cwd=path)
+        ahead = git("rev-list", "--count", f"{onto}..{branch}", cwd=path) if branch != onto else ""
         dirty = len(git("status", "--porcelain", cwd=path).splitlines())
         print(f"{branch:<28} {'+' + ahead if ahead and ahead != '0' else '':>5} "
               f"{f'{dirty} uncommitted' if dirty else '':<15} {path}")
 
 
 def land(check):
-    trees = worktrees()
-    main, active = trees[0]
-    here = git("rev-parse", "--show-toplevel")
     branch = git("branch", "--show-current")
-    if os.path.realpath(here) == os.path.realpath(main) or not branch:
+    onto = branch and base(branch)
+    if not branch or onto == branch:
         sys.exit("Run `zw land` from a worktree, on its branch.")
+    holder = next((path for path, b in worktrees() if b == onto), None)
+    if holder is None:
+        sys.exit(f"{onto} isn't checked out in any worktree.")
     if git("status", "--porcelain"):
         sys.exit("Commit (or drop) this worktree's changes first.")
-    print(f"Rebasing {branch} onto {active}...", flush=True)
-    if not run("git", "rebase", active):
+    print(f"Rebasing {branch} onto {onto}...", flush=True)
+    if not run("git", "rebase", onto):
         sys.exit("The rebase stopped on a conflict: resolve it, `git rebase --continue`, land again.")
     if check and not run(*check):
         sys.exit(f"`{' '.join(check)}` failed after the rebase: fix it, commit, land again.")
-    if not run("git", "merge", "--ff-only", branch, cwd=main):
-        sys.exit(f"Couldn't fast-forward {active}: it moved (land again), or the main checkout "
+    if not run("git", "merge", "--ff-only", branch, cwd=holder):
+        sys.exit(f"Couldn't fast-forward {onto}: it moved (land again), or {holder} "
                  "has uncommitted changes in the same files.")
-    print(f"Landed: {active} is now at {branch} ({git('rev-parse', '--short', 'HEAD')}).")
+    print(f"Landed: {onto} is now at {branch} ({git('rev-parse', '--short', 'HEAD')}).")
 
 
 def done(name):
-    main, active = worktrees()[0]
+    main = worktrees()[0][0]
     path, branch = target(name)
     if os.path.isdir(path):
+        onto = base(branch, cwd=main)
         if git("status", "--porcelain", cwd=path):
             sys.exit(f"{path} has uncommitted changes.")
-        if git("rev-list", "--count", f"{active}..{branch}", cwd=main) not in ("", "0"):
-            sys.exit(f"{branch} has commits not in {active}: land it first.")
+        if git("rev-list", "--count", f"{onto}..{branch}", cwd=main) not in ("", "0"):
+            sys.exit(f"{branch} has commits not in {onto}: land it first.")
         if not run("git", "worktree", "remove", path, cwd=main):
             sys.exit(1)
         run("git", "branch", "-d", branch, cwd=main)

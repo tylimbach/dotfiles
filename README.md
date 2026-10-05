@@ -143,10 +143,12 @@ MSYS2 zsh), and says what's missing. Machine-only shell lines go in
 
 **Claude Code itself** (by hand, once per machine):
 
-- Link the status line: `ln -s ~/dev/dotfiles/claude/statusline-command.sh ~/.claude/statusline-command.sh`.
-  It shows time, user@host, the directory and branch, then `ctx` (the context window used) and the 5-hour and 7-day limits.
+- `install.sh` links the status line and the `implementer`/`reviewer` agents (`claude/agents/`) into `~/.claude`.
+  The status line shows time, user@host, the directory and branch, then `ctx` (the context window used) and the 5-hour and 7-day limits.
 - In `~/.claude/settings.json`, add `"statusLine": {"type": "command", "command": "bash ~/.claude/statusline-command.sh"}`.
 - Add the `zw status` hooks, which mark each tab: `working` on UserPromptSubmit and PostToolUse, `input` on Notification (`permission_prompt|elicitation_dialog`), `done` on Stop, `clear` on SessionEnd.
+- In `~/.claude/settings.json`, add `"worktree": {"baseRef": "head"}`, so subagent worktrees branch from the session's branch (a story), not the default branch.
+- Add `@~/dev/dotfiles/claude/workflow.md` to `~/.claude/CLAUDE.md`: the orchestrator workflow, in every repo and worktree.
 - Project rules, skills and recipes (`CLAUDE.md`, `.claude/`, `justfile`) travel with each repo.
 
 **Windows:**

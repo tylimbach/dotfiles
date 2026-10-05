@@ -223,3 +223,6 @@ _load_ls_colors "$NVIM_THEME"
 [[ "$_OS" == "wsl" ]] && hash -d "w"="/mnt/c/Users/tlimbach"
 [[ "$_OS" == "wsl" || "$_OS" == "linux" ]] && alias ls='ls --color=auto'
 [[ "$_OS" == "wsl" ]] && compdef nvim.exe=nvim 2>/dev/null
+
+# This machine's own additions (installer PATHs, work tools): not in the repo.
+[[ -f "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"

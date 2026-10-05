@@ -133,6 +133,32 @@ This repo contains my cross-platform dotfiles and configs for the tools I use ev
 
 ---
 
+## Claude Code agent workflow
+
+One zellij session per project, a tab per git worktree, each running its own
+agent (`zellij/bin/zw`, `zellij/config/README.md`). `./install.sh` links the
+shell, zellij, `zw` and sccache on macOS, Linux, WSL and Windows (Git Bash or
+MSYS2 zsh), and says what's missing. Machine-only shell lines go in
+`~/.zshrc.local`.
+
+**Claude Code itself** (by hand, once per machine):
+
+- Link the status line: `ln -s ~/dev/dotfiles/claude/statusline-command.sh ~/.claude/statusline-command.sh`.
+  It shows time, user@host, the directory and branch, then `ctx` (the context window used) and the 5-hour and 7-day limits.
+- In `~/.claude/settings.json`, add `"statusLine": {"type": "command", "command": "bash ~/.claude/statusline-command.sh"}`.
+- Add the `zw status` hooks, which mark each tab: `working` on UserPromptSubmit and PostToolUse, `input` on Notification (`permission_prompt|elicitation_dialog`), `done` on Stop, `clear` on SessionEnd.
+- Project rules, skills and recipes (`CLAUDE.md`, `.claude/`, `justfile`) travel with each repo.
+
+**Windows:**
+
+- Install: `winget install zellij jqlang.jq Casey.Just Python.Python.3.13`. Install Claude Code natively; it runs its hooks in Git Bash.
+- Use the same zellij version as the other machines. `zw` uses `zellij action list-tabs --json`, so check with `zellij --version`.
+- `zw` is a Python script. If `python3` opens the Microsoft Store, turn off its App execution alias (Settings > Apps > Advanced app settings).
+- Symlinks need Developer Mode. `install.sh` makes real ones (`MSYS=winsymlinks:nativestrict`).
+- Ghostty has no Windows build. Use WezTerm (`wezterm/`) or Windows Terminal (`windows_terminal/`).
+- Windows takes Alt+Tab before the terminal does, so zellij's Alt+Tab (flip tabs) won't arrive there. Use Alt+1-9.
+- Keep worktrees on a fast local disk (a Dev Drive); each one builds its own `target/`.
+
 ## Copying Configs (Summary Table)
 
 | Tool      | macOS/Linux Config Dir | Windows Config Dir       | Copy from Repo             |

@@ -1,0 +1,2 @@
+*.sh text eol=lf
+zellij/bin/zw text eol=lf

@@ -200,12 +200,14 @@ dark() {
     [[ -f "$ALACRITTY_CONFIG/themes/gruvbox_dark.toml" ]] && \
         cp "$ALACRITTY_CONFIG/themes/gruvbox_dark.toml" "$ALACRITTY_CONFIG/alacritty.toml"
     export NVIM_THEME="dark"; _load_ls_colors dark
+    export DELTA_FEATURES="+gruvbox-dark"
 }
 
 light() {
     [[ -f "$ALACRITTY_CONFIG/themes/gruvbox_light.toml" ]] && \
         cp "$ALACRITTY_CONFIG/themes/gruvbox_light.toml" "$ALACRITTY_CONFIG/alacritty.toml"
     export NVIM_THEME="light"; _load_ls_colors light
+    export DELTA_FEATURES="+gruvbox-light"
 }
 
 # Detect theme at startup
@@ -216,6 +218,7 @@ else
     export NVIM_THEME="dark"
 fi
 _load_ls_colors "$NVIM_THEME"
+export DELTA_FEATURES="+gruvbox-$NVIM_THEME"
 
 # ============================================================
 # Misc

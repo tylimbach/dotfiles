@@ -7,18 +7,29 @@ upstream (its "base"), so a story's worktree can branch its own tasks.
 Inside zellij, each gets a tab named NAME running the agent, with a
 hidden floating shell in the worktree (Alt+w).
 
+A repo can keep a pool instead (`git config zw.pool N`): worktrees at
+../<repo>-pool-K, reused, so a task starts from the last one's build.
+`add` switches an idle one (detached, clean) to agent/NAME, else makes
+another; `done` detaches it and deletes the branch, keeping its files,
+and removes it only past N idle. A pooled worktree holds many tasks'
+agent sessions, so `new NAME -c` resumes the latest one on agent/NAME.
+
   zw new NAME [--codex] [ARGS...]  worktree + tab + agent (ARGS go to the agent);
                                    an existing NAME gets its tab back, or a new one
                                    in its worktree (`zw new NAME -c` resumes there)
   zw add NAME                      worktree only
+  zw path NAME                     NAME's worktree directory
   zw go NAME                       focus NAME's tab
   zw ls                            worktrees: branch, commits ahead, uncommitted files
   zw land [CHECK...]               from a worktree: rebase onto its base,
                                    run CHECK (e.g. `just check`), fast-forward it
-  zw done NAME                     once landed: close the tab, remove worktree and branch
+  zw done NAME [--checked]         once landed: close the tab, remove worktree and branch
+                                   (--checked: the caller checked it landed, e.g. by patch)
   zw status working|input|done|clear
                                    agent hooks: mark this pane's tab name
 """
+import glob
+import itertools
 import json
 import os
 import re
@@ -111,17 +122,61 @@ def base(branch, cwd=None):
     return ref[len("refs/heads/"):] if ref.startswith("refs/heads/") else worktrees()[0][1]
 
 
+def pool_size(main):
+    """How many idle worktrees the repo keeps (`git config zw.pool N`); 0 by
+    default: a worktree per task, removed when done."""
+    value = git("config", "--get", "zw.pool", cwd=main)
+    return int(value) if value.isdigit() else 0
+
+
+def pooled(path, main):
+    return re.fullmatch(re.escape(os.path.basename(main)) + r"-pool-\d+",
+                        os.path.basename(path)) is not None
+
+
+def idle(trees, main):
+    """Pooled worktrees no task holds: detached and clean."""
+    return [path for path, branch in trees[1:] if pooled(path, main)
+            and branch == "(detached)" and not git("status", "--porcelain", cwd=path)]
+
+
 def add(name):
-    main = worktrees()[0][0]
+    trees = worktrees()
+    main = trees[0][0]
     path, branch = target(name)
     if os.path.isdir(path):
         return path
-    here = git("branch", "--show-current") or worktrees()[0][1]
-    if not run("git", "worktree", "add", "-b", branch, path, here, cwd=main):
-        sys.exit(1)
+    here = git("branch", "--show-current") or trees[0][1]
+    free = idle(trees, main) if pool_size(main) else []
+    if free:
+        path = free[0]
+        if not run("git", "switch", "-q", "-c", branch, here, cwd=path):
+            sys.exit(1)
+    else:
+        if pool_size(main):
+            taken = {os.path.basename(p) for p, _ in trees}
+            slot = next(f"{os.path.basename(main)}-pool-{k}" for k in itertools.count(1)
+                        if f"{os.path.basename(main)}-pool-{k}" not in taken)
+            path = os.path.join(os.path.dirname(main), slot)
+        if not run("git", "worktree", "add", "-b", branch, path, here, cwd=main):
+            sys.exit(1)
     git("branch", f"--set-upstream-to={here}", branch, cwd=main)
     print(f"{branch} from {here}, in {path}", flush=True)
     return path
+
+
+def session_of(path, branch):
+    """The latest Claude Code session in PATH on BRANCH, or None: its
+    transcripts sit in a folder named for the directory, and each message
+    records the branch it ran on."""
+    folder = os.path.join(os.path.expanduser("~/.claude/projects"),
+                          re.sub(r"[^A-Za-z0-9-]", "-", path))
+    for transcript in sorted(glob.glob(os.path.join(folder, "*.jsonl")),
+                             key=os.path.getmtime, reverse=True):
+        with open(transcript, encoding="utf-8", errors="replace") as f:
+            if any(f'"gitBranch":"{branch}"' in line.replace(" ", "") for line in f):
+                return os.path.basename(transcript)[:-len(".jsonl")]
+    return None
 
 
 def attached():
@@ -138,6 +193,11 @@ def new(name, args):
     attached()
     if go(name):
         return
+    if pooled(path, worktrees()[0][0]) and ("-c" in args or "--continue" in args):
+        # The directory's latest session may be an earlier task's.
+        session = session_of(path, target(name)[1])
+        args = [a for a in args if a not in ("-c", "--continue")]
+        args = ["--resume", session, *args] if session else args
     agent = ["codex", *[a for a in args if a != "--codex"]] if "--codex" in args else ["claude", *args]
     if zellij("new-tab", "--layout-string", layout(name, path, agent)) is None:
         sys.exit("zellij couldn't open the tab.")
@@ -163,7 +223,12 @@ def layout(name, path, agent):
 
 
 def ls():
-    for path, branch in worktrees():
+    trees = worktrees()
+    free = set(idle(trees, trees[0][0]))
+    for path, branch in trees:
+        if path in free:
+            print(f"{'(idle)':<28} {'':>5} {'':<15} {path}")
+            continue
         onto = base(branch, cwd=path)
         ahead = git("rev-list", "--count", f"{onto}..{branch}", cwd=path) if branch != onto else ""
         dirty = len(git("status", "--porcelain", cwd=path).splitlines())
@@ -192,21 +257,37 @@ def land(check):
     print(f"Landed: {onto} is now at {branch} ({git('rev-parse', '--short', 'HEAD')}).")
 
 
-def done(name):
+def done(name, checked=False):
     main = worktrees()[0][0]
     path, branch = target(name)
     if os.path.isdir(path):
         onto = base(branch, cwd=main)
         if git("status", "--porcelain", cwd=path):
             sys.exit(f"{path} has uncommitted changes.")
-        if git("rev-list", "--count", f"{onto}..{branch}", cwd=main) not in ("", "0"):
+        if not checked and git("rev-list", "--count", f"{onto}..{branch}", cwd=main) not in ("", "0"):
             sys.exit(f"{branch} has commits not in {onto}: land it first.")
-        if not run("git", "worktree", "remove", path, cwd=main):
-            sys.exit(1)
-        run("git", "branch", "-d", branch, cwd=main)
+        release(path, branch, main)
     tid = tab_id(name)
     if tid is not None:
         zellij("close-tab-by-id", str(tid))
+
+
+def release(path, branch, main):
+    """A landed task's worktree goes: a pooled one is detached for the next
+    task, its build kept warm, unless the pool already has enough idle."""
+    if pooled(path, main):
+        if not run("git", "switch", "-q", "--detach", cwd=path):
+            sys.exit(1)
+        run("git", "branch", "-D", branch, cwd=main)
+        free = idle(worktrees(), main)
+        if len(free) > pool_size(main):
+            # The stalest goes: its build is the furthest from what's next.
+            stalest = min(free, key=lambda p: int(git("log", "-1", "--format=%ct", cwd=p) or 0))
+            run("git", "worktree", "remove", stalest, cwd=main)
+        return
+    if not run("git", "worktree", "remove", path, cwd=main):
+        sys.exit(1)
+    run("git", "branch", "-D", branch, cwd=main)
 
 
 def status(state):
@@ -233,6 +314,8 @@ def main():
         new(rest[0], rest[1:])
     elif command == "add" and len(rest) == 1:
         add(rest[0])
+    elif command == "path" and len(rest) == 1:
+        print(target(rest[0])[0])
     elif command == "go" and len(rest) == 1:
         attached()
         go(rest[0]) or sys.exit(f"No tab named {rest[0]}.")
@@ -242,6 +325,8 @@ def main():
         land(rest)
     elif command == "done" and len(rest) == 1:
         done(rest[0])
+    elif command == "done" and rest[1:] == ["--checked"]:
+        done(rest[0], checked=True)
     elif command == "status" and rest and rest[0] in MARKS:
         status(rest[0])  # Codex's notify appends a JSON argument; it's ignored
     else:

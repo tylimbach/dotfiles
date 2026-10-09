@@ -66,14 +66,22 @@ per project. Worktrees sit next to the main checkout as `../<repo>-NAME` on
 `agent/NAME`, branched from the checkout `zw` runs in, which becomes the
 branch's upstream. So a story's worktree can branch tasks that land back into it.
 
+A repo where builds are slow can pool them instead: `git config zw.pool N`
+keeps up to N idle worktrees (`../<repo>-pool-K`) and reuses them, so a task
+starts from the last one's build rather than a cold one. The task's branch
+and tab keep its name; only the directory is shared. `zw done` detaches a
+pooled worktree instead of removing it, past N idle the stalest goes, and
+`zw new NAME -c` resumes the session that ran on `agent/NAME`.
+
 | Command | Does |
 |------|--------|
 | `zw new NAME [--codex] [ARGS]` | Worktree + tab: the agent full-size, a hidden shell there (Alt+w) |
 | `zw new NAME -c` | Reopen an existing worktree (zw's or Claude Code's `.claude/worktrees/NAME`), resuming its last session |
 | `zw go NAME` | Focus NAME's tab |
+| `zw path NAME` | Print NAME's worktree directory |
 | `zw ls` | Worktrees: branch, commits ahead, uncommitted files |
 | `zw land [CHECK...]` | From a worktree: rebase onto its upstream, run CHECK, fast-forward it |
-| `zw done NAME` | Once landed: close the tab, remove the worktree and branch |
+| `zw done NAME` | Once landed: close the tab, remove the worktree and branch (a pooled one is kept, detached) |
 
 Agent hooks mark each tab: `●` working, `?` needs you, `✓` finished.
 Claude Code (`~/.claude/settings.json`): `zw status working` on

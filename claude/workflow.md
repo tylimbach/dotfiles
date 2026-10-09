@@ -58,6 +58,9 @@ Work out which one you are from where you run:
 - A new worktree has no submodules. If the repo has `.gitmodules`, run
   `git submodule update --init --recursive` in the worktree before building.
 - `zw land` refuses uncommitted changes, and `zw done` refuses unlanded commits.
+- A repo with `git config zw.pool N` reuses worktrees (`../<repo>-pool-K`): the
+  task's branch and tab keep its name, its directory is shared, and its build
+  starts warm. `zw path NAME` finds it; `zw done` detaches it for the next task.
   Don't force either.
 - `zw` commands: `new NAME [-c] [ARGS]`, `add NAME`, `go NAME`, `ls`,
   `land [CHECK...]`, `done NAME`. Tab actions need a live zellij session; outside

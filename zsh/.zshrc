@@ -33,6 +33,14 @@ SAVEHIST=50000
 setopt hist_ignore_all_dups share_history
 
 # ============================================================
+# Open files — macOS gives Dock-launched apps 256, which a long zellij
+# session (panes, plugins, many attached views) can exhaust: its server
+# then panics and every pane dies. Raise, never lower; quiet where the
+# hard limit is below.
+# ============================================================
+[[ "$(ulimit -n)" != unlimited ]] && (( $(ulimit -n) < 10240 )) && ulimit -n 10240 2>/dev/null
+
+# ============================================================
 # Platform detection — $OSTYPE/$MSYSTEM are builtins, no subprocess
 # ============================================================
 _OS="unknown"

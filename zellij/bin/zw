@@ -25,19 +25,49 @@ agent sessions, so `new NAME -c` resumes the latest one on agent/NAME.
                                    run CHECK (e.g. `just check`), fast-forward it
   zw done NAME [--checked]         once landed: close the tab, remove worktree and branch
                                    (--checked: the caller checked it landed, e.g. by patch)
+  zw sync NAME                     an agent already in tab NAME, quit by the person:
+                                   resumed in a fresh tab, with Orca's view (below)
   zw status working|input|done|clear
                                    agent hooks: mark this pane's tab name
+
+With Orca (onorca.dev) running, `new` and `sync` also open the tab in Orca:
+a terminal Orca opens in the worktree opens the zellij tab and attaches to
+the session, so Orca's tab and zellij's are two views of one agent. Orca
+hears of an agent only through its hooks, which report for the Orca pane
+named in the agent's environment, so the agent starts with that terminal's
+identity (IDENTITY; never the hooks' token, which they reread from the
+endpoint file). `done` closes Orca's views too. Without Orca, nothing
+changes; with Orca installed but unreachable, zw says why. Setup:
+orca/README.md.
 """
 import glob
 import itertools
 import json
 import os
 import re
+import shlex
+import shutil
 import subprocess
 import sys
 
 MARKS = {"working": "●", "input": "?", "done": "✓", "clear": ""}
 MARK_RE = re.compile(r" [●?✓]$")
+# On Linux `orca` is usually the GNOME screen reader; Orca's CLI is `orca-ide`.
+ORCA = (shutil.which("orca-ide" if sys.platform == "linux" else "orca")
+        or "/Applications/Orca.app/Contents/Resources/bin/orca")
+NO_ORCA = "Orca isn't installed"
+# What an agent needs for Orca's hooks to report for an Orca pane. Codex's
+# hook runs only with the port set; the port is no secret.
+IDENTITY = ["ORCA_PANE_KEY", "ORCA_TAB_ID", "ORCA_WORKTREE_ID", "ORCA_AGENT_HOOK_ENDPOINT",
+            "ORCA_AGENT_HOOK_PORT", "ORCA_AGENT_HOOK_ENV", "ORCA_AGENT_HOOK_VERSION",
+            "ORCA_AGENT_HOOK_TRANSPORT"]
+AGENTS = ("claude", "codex")
+# Codex otherwise hands turns to a shared background server, which runs the
+# hooks in its own environment: neither zellij's pane nor Orca's identity
+# reaches them, so no tab marks and no Orca status. Orca adds it too.
+CODEX_FLAGS = ("--no-daemon",)
+# Claude's flags a resumed session keeps; the rest of its command was the brief.
+KEPT_FLAGS = ("--model", "--effort")
 
 
 def git(*args, cwd=None):
@@ -49,22 +79,29 @@ def run(*args, cwd=None):
     return subprocess.run(list(args), cwd=cwd).returncode == 0
 
 
-def live():
-    """This shell's zellij session is running. A renamed session keeps its
-    old name in ZELLIJ_SESSION_NAME, and actions sent there hang."""
+def session():
+    """The zellij session zw drives, or None: this pane's, else the one named
+    for the repo's main checkout, so zw works from outside zellij too (an Orca
+    terminal). A renamed session keeps its old name in ZELLIJ_SESSION_NAME,
+    and actions sent there hang."""
     out = subprocess.run(["zellij", "list-sessions", "--no-formatting"],
                          capture_output=True, encoding="utf-8").stdout
     alive = {line.split()[0] for line in out.splitlines() if line and "EXITED" not in line}
-    return os.environ.get("ZELLIJ_SESSION_NAME") in alive
+    if os.environ.get("ZELLIJ_SESSION_NAME") in alive:
+        return os.environ["ZELLIJ_SESSION_NAME"]
+    common = git("rev-parse", "--path-format=absolute", "--git-common-dir")
+    repo = os.path.basename(os.path.dirname(common)) if common else None
+    return repo if repo in alive else None
 
 
-def zellij(*args, capture=False):
-    """A zellij action in this session, or None outside a live one."""
-    if "ZELLIJ" not in os.environ or not live():
+def zellij(*args, capture=False, name=None):
+    """A zellij action in session NAME (by default zw's), or None without one."""
+    name = name or session()
+    if name is None:
         return None
     try:
-        out = subprocess.run(["zellij", "action", *args], capture_output=True, encoding="utf-8",
-                             timeout=3, stdin=subprocess.DEVNULL)
+        out = subprocess.run(["zellij", "--session", name, "action", *args], capture_output=True,
+                             encoding="utf-8", timeout=3, stdin=subprocess.DEVNULL)
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return None
     if out.returncode != 0:
@@ -180,12 +217,10 @@ def session_of(path, branch):
 
 
 def attached():
-    """Exit unless this shell can drive its zellij session."""
-    if "ZELLIJ" not in os.environ:
-        sys.exit("Not in zellij.")
-    if not live():
-        sys.exit(f"This pane's zellij session, {os.environ.get('ZELLIJ_SESSION_NAME')!r}, isn't "
-                 "running: renamed since the pane opened? Retry from a new pane.")
+    """Exit unless zw has a zellij session to drive."""
+    if session() is None:
+        sys.exit(f"No zellij session: this pane's ({os.environ.get('ZELLIJ_SESSION_NAME')!r}) "
+                 "isn't running (renamed since it opened?), and none is named for the repo.")
 
 
 def new(name, args):
@@ -198,9 +233,148 @@ def new(name, args):
         session = session_of(path, target(name)[1])
         args = [a for a in args if a not in ("-c", "--continue")]
         args = ["--resume", session, *args] if session else args
-    agent = ["codex", *[a for a in args if a != "--codex"]] if "--codex" in args else ["claude", *args]
+    agent = (["codex", *CODEX_FLAGS, *[a for a in args if a != "--codex"]] if "--codex" in args
+             else ["claude", *args])
+    open_views(name, path, agent)
+
+
+def orca_unreachable():
+    """Why Orca can't be reached, or None when it can. A running Orca can
+    look absent: a sandboxed shell can't open its socket, and the PATH link
+    its settings install can be one the user can't resolve."""
+    if not os.path.exists(ORCA):
+        return NO_ORCA
+    reply = subprocess.run([ORCA, "status", "--json"], capture_output=True, encoding="utf-8")
+    try:
+        if json.loads(reply.stdout)["result"]["runtime"]["reachable"]:
+            return None
+    except (ValueError, KeyError, TypeError):
+        pass
+    said = (reply.stdout + reply.stderr).strip().splitlines()
+    return f"`orca status` says {said[-1]!r}" if said else "`orca status` said nothing"
+
+
+def open_views(name, path, agent, replace=None):
+    """Tab NAME running AGENT in PATH (in place of tab id REPLACE), and with
+    Orca, Orca's terminal in PATH viewing it: that terminal opens the tab
+    (`zw view`), so the agent gets its identity."""
+    problem = orca_unreachable()
+    if problem is None:
+        view = [sys.executable, os.path.realpath(__file__), "view", session(), name, path]
+        view += [replace] if replace else []
+        # The command is quoted for a POSIX shell; Windows terminals default
+        # to PowerShell.
+        shell = ["--shell", "git-bash"] if os.name == "nt" else []
+        if run(ORCA, "terminal", "create", "--worktree", f"path:{path}", "--title", name, *shell,
+               "--command", shlex.join([*view, "--", *agent])):
+            return
+        problem = "`orca terminal create` failed"
+    if problem != NO_ORCA:
+        print(f"No Orca view for {name}: {problem}. The zellij tab alone; once Orca is "
+              f"reachable, quit the agent and `zw sync {name}`.", file=sys.stderr)
+    if replace:
+        zellij("close-tab-by-id", replace)
     if zellij("new-tab", "--layout-string", layout(name, path, agent)) is None:
         sys.exit("zellij couldn't open the tab.")
+
+
+def view(zsession, name, path, replace, agent):
+    """In Orca's terminal: tab NAME running AGENT with this terminal's Orca
+    identity, then this terminal attached to the session. The view lands on
+    a tab zellij picks, usually the new one: no zellij action steers one
+    chosen client, so the person may switch it once."""
+    identity = [f"{k}={os.environ[k]}" for k in IDENTITY if k in os.environ]
+    if replace:
+        zellij("close-tab-by-id", replace, name=zsession)
+    if identity:
+        agent = [sys.executable, os.path.realpath(__file__), "run", *identity, "--", *agent]
+    if zellij("new-tab", "--layout-string", layout(name, path, agent), name=zsession) is None:
+        sys.exit(f"zellij couldn't open tab {name} in session {zsession}: is a client attached?")
+    os.execvp("zellij", ["zellij", "attach", zsession])
+
+
+def run_with(args):
+    """`zw run KEY=VALUE... -- COMMAND...`: COMMAND with those set (no `env`
+    on Windows)."""
+    split = args.index("--")
+    os.environ.update(a.split("=", 1) for a in args[:split])
+    os.execvp(args[split + 1], args[split + 1:])
+
+
+def program(command):
+    """The agent COMMAND runs, or "": the first word naming one (zellij gives
+    the command as one string, and a value before it may hold spaces; the
+    brief comes after it)."""
+    names = [os.path.basename(w) for w in command.split()]
+    return next((n for n in names if n in AGENTS), "")
+
+
+def resumed(command, session=None):
+    """The command resuming the agent a tab was started with COMMAND for:
+    Claude's SESSION, else the latest in the worktree; Codex's latest there."""
+    agent = program(command)
+    if agent == "codex":
+        return ["codex", *CODEX_FLAGS, "resume", "--last"]
+    if agent != "claude":
+        sys.exit(f"Not an agent zw knows how to resume: {command!r}")
+    words = command.split()
+    kept, rest = [], words[[os.path.basename(w) for w in words].index("claude") + 1:]
+    while rest:
+        if rest[0] == "--continue":  # an agent synced before
+            rest = rest[1:]
+        elif rest[0] == "--resume" and len(rest) >= 2:  # one resumed by hand
+            rest = rest[2:]
+        elif rest[0] in KEPT_FLAGS and len(rest) >= 2:
+            kept, rest = kept + rest[:2], rest[2:]
+        else:
+            break
+    return ["claude", *(["--resume", session] if session else ["--continue"]), *kept]
+
+
+def sync(name):
+    """An agent in tab NAME, quit by the person, resumed with Orca's view."""
+    attached()
+    tid = tab_id(name)
+    if tid is None:
+        sys.exit(f"No tab named {name}.")
+    panes = [p for p in json.loads(zellij("list-panes", "--json", capture=True) or "[]")
+             if p["tab_id"] == tid and not p["is_plugin"] and not p["is_floating"]]
+    if len(panes) != 1:
+        sys.exit(f"Tab {name} has {len(panes)} tiled panes; expected the agent's alone.")
+    pane = panes[0]
+    # zw's tabs run the agent as the pane's command; once it quits, the pane
+    # holds or drops to a shell.
+    started = pane.get("terminal_command") or ""
+    if not started:
+        sys.exit(f"Tab {name}'s agent was typed into a shell: resume it by hand.")
+    if not pane["exited"] and program(pane.get("pane_command") or "") in AGENTS:
+        sys.exit(f"Quit the agent in tab {name} first (Claude: /exit; Codex: /quit), then rerun.")
+    if problem := orca_unreachable():
+        sys.exit(f"Orca can't be reached: {problem}.")
+    # zellij drops an exited pane's folder.
+    path = pane.get("pane_cwd") or target(name)[0]
+    old = next((w.split("=", 1)[1] for w in started.split() if w.startswith("ORCA_TAB_ID=")), None)
+    # A pooled worktree holds earlier tasks' sessions, so not its latest:
+    # the latest on the tab's branch, as `new -c` resumes.
+    branch = git("branch", "--show-current", cwd=path) or target(name)[1]
+    session = session_of(path, branch)
+    if program(started) == "claude" and session is None:
+        sys.exit(f"No Claude session on {branch} in {path}: resume it by hand.")
+    open_views(name, path, resumed(started, session), replace=str(tid))
+    if old:  # the old tab's view would fall to another tab
+        close_views(lambda t: t.get("tabId") == old)
+
+
+def close_views(which):
+    """Close Orca's terminals WHICH picks from `orca terminal list`."""
+    if orca_unreachable():
+        return
+    listed = subprocess.run([ORCA, "terminal", "list", "--json"], capture_output=True,
+                            encoding="utf-8").stdout
+    for terminal in json.loads(listed or "{}").get("result", {}).get("terminals", []):
+        if which(terminal):
+            subprocess.run([ORCA, "terminal", "close", "--terminal", terminal["handle"]],
+                           capture_output=True)
 
 
 def kdl(text):
@@ -266,6 +440,8 @@ def done(name, checked=False):
             sys.exit(f"{path} has uncommitted changes.")
         if not checked and git("rev-list", "--count", f"{onto}..{branch}", cwd=main) not in ("", "0"):
             sys.exit(f"{branch} has commits not in {onto}: land it first.")
+    close_views(lambda t: os.path.realpath(t.get("worktreePath", "")) == os.path.realpath(path))
+    if os.path.isdir(path):
         release(path, branch, main)
     tid = tab_id(name)
     if tid is not None:
@@ -327,6 +503,13 @@ def main():
         done(rest[0])
     elif command == "done" and rest[1:] == ["--checked"]:
         done(rest[0], checked=True)
+    elif command == "sync" and len(rest) == 1:
+        sync(rest[0])
+    elif command == "view" and "--" in rest and len(rest[:rest.index("--")]) in (3, 4):
+        head, agent = rest[:rest.index("--")], rest[rest.index("--") + 1:]
+        view(*head[:3], head[3] if len(head) == 4 else None, agent)
+    elif command == "run" and "--" in rest:
+        run_with(rest)
     elif command == "status" and rest and rest[0] in MARKS:
         status(rest[0])  # Codex's notify appends a JSON argument; it's ignored
     else:

@@ -150,6 +150,9 @@ MSYS2 zsh), and says what's missing. Machine-only shell lines go in
 - In `~/.claude/settings.json`, add `"worktree": {"baseRef": "head"}`, so subagent worktrees branch from the session's branch (a story), not the default branch.
 - Add `@~/dev/dotfiles/claude/workflow.md` to `~/.claude/CLAUDE.md`: the orchestrator workflow, in every repo and worktree.
 - Project rules, skills and recipes (`CLAUDE.md`, `.claude/`, `justfile`) travel with each repo.
+- Start each zellij session from a plain terminal (`cd REPO && zellij attach -c REPO`): its panes get the server's environment, so one started inside an agent passes that agent's identity to every pane.
+
+**Orca** (optional): with it running, `zw new` and `zw sync` also give each agent a tab in Orca, a second view of the same process; `zw done` closes it. Setup, a check per step and rules for agents: `orca/README.md`.
 
 **Windows:**
 

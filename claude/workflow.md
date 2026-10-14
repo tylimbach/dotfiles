@@ -63,5 +63,11 @@ Work out which one you are from where you run:
   starts warm. `zw path NAME` finds it; `zw done` detaches it for the next task.
   Don't force either.
 - `zw` commands: `new NAME [-c] [ARGS]`, `add NAME`, `go NAME`, `ls`,
-  `land [CHECK...]`, `done NAME`. Tab actions need a live zellij session; outside
-  one, use `zw add`/`ls`/`land`/`done` and the subagent path.
+  `land [CHECK...]`, `done NAME`, `sync NAME`. Tab actions need a zellij
+  session: this pane's, or a running one named for the repo's main
+  checkout. Without either, use `zw add`/`ls`/`land`/`done` and the
+  subagent path.
+- With Orca running, `zw new` also opens the agent's tab in Orca; follow
+  `~/dev/dotfiles/orca/README.md`, "Rules for agents": agents start with
+  `zw new` and end with `zw done`, never through Orca's worktree or agent
+  commands.

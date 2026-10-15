@@ -294,7 +294,7 @@ def view(zsession, name, path, replace, agent):
         agent = [sys.executable, os.path.realpath(__file__), "run", *identity, "--", *agent]
     if zellij("new-tab", "--layout-string", layout(name, path, agent), name=zsession) is None:
         sys.exit(f"zellij couldn't open tab {name} in session {zsession}: is a client attached?")
-    os.execvp("zellij", ["zellij", "attach", zsession])
+    replace_with(["zellij", "attach", zsession])
 
 
 def run_with(args):
@@ -302,7 +302,16 @@ def run_with(args):
     on Windows)."""
     split = args.index("--")
     os.environ.update(a.split("=", 1) for a in args[:split])
-    os.execvp(args[split + 1], args[split + 1:])
+    replace_with(args[split + 1:])
+
+
+def replace_with(command):
+    """Become COMMAND. Windows has no exec: its os.execvp starts COMMAND and
+    exits, so zellij would take the pane for exited and its keys from the
+    agent. There, wait on COMMAND instead."""
+    if os.name == "nt":
+        sys.exit(subprocess.run(command).returncode)
+    os.execvp(command[0], command)
 
 
 def program(command):

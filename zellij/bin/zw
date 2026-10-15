@@ -49,6 +49,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 
 MARKS = {"working": "●", "input": "?", "done": "✓", "clear": ""}
 MARK_RE = re.compile(r" [●?✓]$")
@@ -113,9 +114,31 @@ def zellij(*args, capture=False, name=None):
     return out.stdout if capture else ""
 
 
-def tabs():
-    out = zellij("list-tabs", "--json", capture=True)
+def tabs(zsession=None):
+    out = zellij("list-tabs", "--json", capture=True, name=zsession)
     return json.loads(out) if out else []
+
+
+def clients(zsession=None):
+    out = zellij("list-clients", capture=True, name=zsession)
+    return len([line for line in (out or "").splitlines()[1:] if line.strip()])
+
+
+def retab(name, path, agent, replace=None, zsession=None):
+    """Tab NAME running AGENT in PATH, then tab id REPLACE retired. zellij
+    0.45 crashes on a tab made with no client attached (it has no size to
+    lay out in) and on a tab closed under a client's view, so neither: a
+    viewed REPLACE is renamed, not closed."""
+    if not clients(zsession):
+        sys.exit(f"No client is attached to zellij session {zsession or session()!r}: "
+                 "attach one, then retry.")
+    if zellij("new-tab", "--layout-string", layout(name, path, agent), name=zsession) is None:
+        sys.exit("zellij couldn't open the tab.")
+    old = next((t for t in tabs(zsession) if str(t["tab_id"]) == replace), None) if replace else None
+    if old and (old["active"] or old["other_focused_clients"]):
+        zellij("rename-tab-by-id", replace, f"{MARK_RE.sub('', old['name'])}-old", name=zsession)
+    elif old:
+        zellij("close-tab-by-id", replace, name=zsession)
 
 
 def tab_id(name):
@@ -276,25 +299,35 @@ def open_views(name, path, agent, replace=None):
     if problem != NO_ORCA:
         print(f"No Orca view for {name}: {problem}. The zellij tab alone; once Orca is "
               f"reachable, quit the agent and `zw sync {name}`.", file=sys.stderr)
-    if replace:
-        zellij("close-tab-by-id", replace)
-    if zellij("new-tab", "--layout-string", layout(name, path, agent)) is None:
-        sys.exit("zellij couldn't open the tab.")
+    retab(name, path, agent, replace)
 
 
 def view(zsession, name, path, replace, agent):
     """In Orca's terminal: tab NAME running AGENT with this terminal's Orca
     identity, then this terminal attached to the session. The view lands on
     a tab zellij picks, usually the new one: no zellij action steers one
-    chosen client, so the person may switch it once."""
+    chosen client, so the person may switch it once. The tab comes once
+    this terminal's client is attached (`zw tab`), so it has a size."""
     identity = [f"{k}={os.environ[k]}" for k in IDENTITY if k in os.environ]
-    if replace:
-        zellij("close-tab-by-id", replace, name=zsession)
     if identity:
         agent = [sys.executable, os.path.realpath(__file__), "run", *identity, "--", *agent]
-    if zellij("new-tab", "--layout-string", layout(name, path, agent), name=zsession) is None:
-        sys.exit(f"zellij couldn't open tab {name} in session {zsession}: is a client attached?")
+    helper = [sys.executable, os.path.realpath(__file__), "tab", zsession, str(clients(zsession)),
+              name, path, replace or "-", "--", *agent]
+    hidden = ({"creationflags": 0x08000000} if os.name == "nt"  # CREATE_NO_WINDOW
+              else {"start_new_session": True})
+    subprocess.Popen(helper, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, **hidden)
     replace_with(["zellij", "attach", zsession])
+
+
+def tab_when_attached(zsession, before, name, path, replace, agent):
+    """Behind `zw view`: once a client beyond the BEFORE already attached
+    connects (the view's), its tab."""
+    for _ in range(100):
+        if clients(zsession) > int(before):
+            retab(name, path, agent, None if replace == "-" else replace, zsession)
+            return
+        time.sleep(0.2)
 
 
 def run_with(args):
@@ -523,6 +556,8 @@ def main():
     elif command == "view" and "--" in rest and len(rest[:rest.index("--")]) in (3, 4):
         head, agent = rest[:rest.index("--")], rest[rest.index("--") + 1:]
         view(*head[:3], head[3] if len(head) == 4 else None, agent)
+    elif command == "tab" and "--" in rest and rest.index("--") == 5:
+        tab_when_attached(*rest[:5], rest[6:])
     elif command == "run" and "--" in rest:
         run_with(rest)
     elif command == "status" and rest and rest[0] in MARKS:

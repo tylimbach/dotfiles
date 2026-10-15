@@ -53,8 +53,12 @@ import sys
 MARKS = {"working": "●", "input": "?", "done": "✓", "clear": ""}
 MARK_RE = re.compile(r" [●?✓]$")
 # On Linux `orca` is usually the GNOME screen reader; Orca's CLI is `orca-ide`.
+# Its install path too: a zellij pane keeps its server's PATH, maybe from before
+# Orca put its CLI there.
 ORCA = (shutil.which("orca-ide" if sys.platform == "linux" else "orca")
-        or "/Applications/Orca.app/Contents/Resources/bin/orca")
+        or (os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "orca", "resources",
+                         "bin", "orca.exe") if os.name == "nt"
+            else "/Applications/Orca.app/Contents/Resources/bin/orca"))
 NO_ORCA = "Orca isn't installed"
 # What an agent needs for Orca's hooks to report for an Orca pane. Codex's
 # hook runs only with the port set; the port is no secret.

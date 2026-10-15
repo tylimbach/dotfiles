@@ -147,6 +147,9 @@ MSYS2 zsh), and says what's missing. Machine-only shell lines go in
   The status line shows time, user@host, the directory and branch, then `ctx` (the context window used) and the 5-hour and 7-day limits.
 - In `~/.claude/settings.json`, add `"statusLine": {"type": "command", "command": "bash ~/.claude/statusline-command.sh"}`.
 - Add the `zw status` hooks, which mark each tab: `working` on UserPromptSubmit and PostToolUse, `input` on Notification (`permission_prompt|elicitation_dialog`), `done` on Stop, `clear` on SessionEnd.
+- **Codex** (`~/.codex/hooks.json`): the same marks, with `input` on PermissionRequest (after any hook already there: Codex trusts hooks by position, so moving one untrusts it; trust a new one with `/hooks`).
+  Its sandbox writes only inside the worktree, so in `~/.codex/config.toml` add each repo's main `.git` (`[sandbox_workspace_write]`, `writable_roots = ["REPO/.git"]`), or every commit in a worktree asks.
+  In `~/.codex/rules/default.rules`, one `prefix_rule(pattern=["zellij", "-s", "SESSION", "action", "write-chars"], decision="allow")` each for `write-chars`, `write` and `dump-screen`, so messages between agents don't ask; check a rule with `codex execpolicy check -r FILE COMMAND...` (no `--`): a bad line silently voids the file.
 - In `~/.claude/settings.json`, add `"worktree": {"baseRef": "head"}`, so subagent worktrees branch from the session's branch (a story), not the default branch.
 - Add `@~/dev/dotfiles/claude/workflow.md` to `~/.claude/CLAUDE.md`: the orchestrator workflow, in every repo and worktree.
 - Project rules, skills and recipes (`CLAUDE.md`, `.claude/`, `justfile`) travel with each repo.

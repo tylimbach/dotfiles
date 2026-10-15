@@ -15,6 +15,9 @@ its zellij tab; Orca's tab is a second view of the same process.
   environment. So `zw view` starts the agent with its terminal's identity
   (`ORCA_PANE_KEY` and the rest of `IDENTITY` in `zw`), through `zw run`.
   Never the hooks' token: they reread it from Orca's endpoint file.
+- Orca's status for an agent changes only when a hook fires: after you
+  approve a command, it shows waiting until the command finishes. Fewer
+  approvals (README, "Codex") means fewer such gaps.
 - Codex runs with `--no-daemon`: its shared background server would run
   the hooks in its own environment, so neither Orca nor `zw status` would
   hear from it.

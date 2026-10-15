@@ -463,9 +463,11 @@ def release(path, branch, main):
         if len(free) > pool_size(main):
             # The stalest goes: its build is the furthest from what's next.
             stalest = min(free, key=lambda p: int(git("log", "-1", "--format=%ct", cwd=p) or 0))
-            run("git", "worktree", "remove", stalest, cwd=main)
+            run("git", "worktree", "remove", "--force", stalest, cwd=main)
         return
-    if not run("git", "worktree", "remove", path, cwd=main):
+    # Checked clean above; --force because git won't otherwise remove a worktree
+    # with submodules.
+    if not run("git", "worktree", "remove", "--force", path, cwd=main):
         sys.exit(1)
     run("git", "branch", "-D", branch, cwd=main)
 

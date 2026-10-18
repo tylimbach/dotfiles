@@ -9,7 +9,7 @@ all work is held to.
 
 - The main checkout stays on the default branch, pulled. Each story is
   `zw new STORY "<what it is>"` from there: `../<repo>-STORY` on `agent/STORY`,
-  in its own zellij tab, with its own orchestrator. Stories run in parallel.
+  in its own Orca terminal or zellij tab, with its own orchestrator. Stories run in parallel.
 - A story's tasks branch from the story and land back into it, never into
   another story or the default branch.
 - A story ships as its own PR, when I ask:
@@ -39,12 +39,13 @@ Work out which one you are from where you run:
      `.claude/worktrees/`. Run independent tasks in parallel. I can open one
      with `zw new NAME -c`.
    - Long or hands-on work I want to watch or steer: `zw new NAME "<brief>"`
-     from the story's checkout opens it in its own zellij tab, branched from
-     the story. Its tab shows `●` working, `?` needs me, `✓` done. Check `zw ls` and its branch's commits when it's done.
+     from the story's checkout starts it on the repo's host (an Orca terminal,
+     or a zellij tab marked `●` working, `?` needs me, `✓` done), branched
+     from the story. Check `zw ls` and its branch's commits when it's done.
 4. **Review** each finished task with the `reviewer` agent: give it the worktree
    path, the branch, the base, and the brief. Run a fresh one per round.
-5. **Iterate**: send the findings back to the same implementer (SendMessage) or
-   the tab, then review again. Stop when the reviewer finds no blocking issues
+5. **Iterate**: send the findings back to the same implementer, or the task's
+   agent by its name (SendMessage; a Codex: `zw msg NAME TEXT`), then review again. Stop when the reviewer finds no blocking issues
    and the acceptance criteria are met. After 3 rounds, bring it to me instead.
 6. **Land**, from the task's worktree: `zw land [CHECK...]` (rebases onto the
    branch's upstream, the story; runs CHECK; fast-forwards the story). Then
@@ -63,11 +64,12 @@ Work out which one you are from where you run:
   starts warm. `zw path NAME` finds it; `zw done` detaches it for the next task.
   Don't force either.
 - `zw` commands: `new NAME [-c] [ARGS]`, `add NAME`, `go NAME`, `ls`,
-  `land [CHECK...]`, `done NAME`, `sync NAME`. Tab actions need a zellij
-  session: this pane's, or a running one named for the repo's main
-  checkout. Without either, use `zw add`/`ls`/`land`/`done` and the
+  `land [CHECK...]`, `done NAME`, `resume NAME`, `move orca|zellij [NAME...]`,
+  `msg NAME TEXT`. The host is the repo's `git config zw.host`; zellij's
+  needs a session, this pane's or a running one named for the repo's main
+  checkout. Without a host, use `zw add`/`ls`/`land`/`done` and the
   subagent path.
-- With Orca running, `zw new` also opens the agent's tab in Orca; follow
-  `~/dev/dotfiles/orca/README.md`, "Rules for agents": agents start with
-  `zw new` and end with `zw done`, never through Orca's worktree or agent
-  commands.
+- With Orca, follow `~/dev/dotfiles/orca/README.md`, "Rules for agents":
+  agents start with `zw new` and end with `zw done`, never through Orca's
+  worktree or agent commands. `zw move` is the person's: never move agents
+  unasked.

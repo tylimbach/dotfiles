@@ -135,8 +135,8 @@ This repo contains my cross-platform dotfiles and configs for the tools I use ev
 
 ## Claude Code agent workflow
 
-One zellij session per project, a tab per git worktree, each running its own
-agent (`zellij/bin/zw`, `zellij/config/README.md`). `./install.sh` links the
+A git worktree per task, each running its own agent, in Orca or in a zellij
+tab (`zellij/bin/zw`, `zellij/config/README.md`). `./install.sh` links the
 shell, zellij, `zw` and sccache on macOS, Linux, WSL and Windows (Git Bash or
 MSYS2 zsh), and says what's missing. Machine-only shell lines go in
 `~/.zshrc.local`.
@@ -148,14 +148,15 @@ MSYS2 zsh), and says what's missing. Machine-only shell lines go in
 - In `~/.claude/settings.json`, add `"statusLine": {"type": "command", "command": "bash ~/.claude/statusline-command.sh"}`.
 - Add the `zw status` hooks, which mark each tab: `working` on UserPromptSubmit and PostToolUse, `input` on Notification (`permission_prompt|elicitation_dialog`), `done` on Stop, `clear` on SessionEnd.
 - **Codex** (`~/.codex/hooks.json`): the same marks, with `input` on PermissionRequest (after any hook already there: Codex trusts hooks by position, so moving one untrusts it; trust a new one with `/hooks`).
-  Its sandbox writes only inside the worktree, so in `~/.codex/config.toml` add each repo's main `.git` (`[sandbox_workspace_write]`, `writable_roots = ["REPO/.git"]`), or every commit in a worktree asks.
-  In `~/.codex/rules/default.rules`, one `prefix_rule(pattern=["zellij", "-s", "SESSION", "action", "write-chars"], decision="allow")` each for `write-chars`, `write` and `dump-screen`, so messages between agents don't ask; check a rule with `codex execpolicy check -r FILE COMMAND...` (no `--`): a bad line silently voids the file.
+  Its sandbox keeps a worktree's git data read-only (no writable root lifts it), so in `~/.codex/rules/default.rules` add one `prefix_rule(pattern=["git", "add"], decision="allow")` each for `add`, `commit` and `rebase`, or every commit in a worktree asks; an allowed command runs outside the sandbox unasked.
+  Likewise `prefix_rule(pattern=["zw", "msg"], decision="allow")`, so messages between agents don't ask; check a rule with `codex execpolicy check -r FILE COMMAND...` (no `--`): a bad line silently voids the file.
+  In `~/.codex/config.toml`, `check_for_update_on_startup = false`: the update offer Codex shows on starting takes the first text typed into it as an answer.
 - In `~/.claude/settings.json`, add `"worktree": {"baseRef": "head"}`, so subagent worktrees branch from the session's branch (a story), not the default branch.
 - Add `@~/dev/dotfiles/claude/workflow.md` to `~/.claude/CLAUDE.md`: the orchestrator workflow, in every repo and worktree.
 - Project rules, skills and recipes (`CLAUDE.md`, `.claude/`, `justfile`) travel with each repo.
 - Start each zellij session from a plain terminal (`cd REPO && zellij attach -c REPO`): its panes get the server's environment, so one started inside an agent passes that agent's identity to every pane.
 
-**Orca** (optional): with it running, `zw new` and `zw sync` also give each agent a tab in Orca, a second view of the same process; `zw done` closes it. Setup, a check per step and rules for agents: `orca/README.md`.
+**Orca** (optional): with `git config zw.host orca` in a repo, `zw new` starts its agents in Orca, and `zw move zellij` (or `orca`) moves every idle agent's conversation between the two. Setup, a check per step and rules for agents: `orca/README.md`.
 
 **Windows:**
 

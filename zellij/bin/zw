@@ -90,6 +90,10 @@ CODEX_FLAGS = ("--no-daemon",)
 # Codex's first prompt after a resume.
 MOVED = ("(zw: this conversation was resumed in {}. Nothing else changed: carry on, "
          "or if you were waiting for someone, keep waiting.)")
+class Stuck(Exception):
+    """Why an agent can't be resumed: `move` reports it and goes on."""
+
+
 # What a resumed agent keeps of how it was started.
 SPEC = ("agent", "model", "effort")
 
@@ -321,9 +325,9 @@ def session_of(path, branch):
 
 
 def codex_session_of(path, branch):
-    """The latest Codex session started in PATH on BRANCH, or None: each
-    transcript's first line records its folder and branch. (`codex resume
-    --last` can pick another worktree's.)"""
+    """The latest Codex conversation started in PATH on BRANCH, not a
+    subagent's thread, or None: each transcript's first line records them.
+    (`codex resume --last` can pick another worktree's.)"""
     home = os.environ.get("CODEX_HOME") or os.path.expanduser("~/.codex")
     transcripts = glob.glob(os.path.join(home, "sessions", "*", "*", "*", "rollout-*.jsonl"))
     for transcript in sorted(transcripts, key=os.path.getmtime, reverse=True)[:500]:
@@ -332,7 +336,7 @@ def codex_session_of(path, branch):
                 meta = json.loads(f.readline()).get("payload", {})
         except (OSError, ValueError):
             continue
-        if (os.path.realpath(meta.get("cwd") or "/") == path
+        if (os.path.realpath(meta.get("cwd") or "/") == path and meta.get("thread_source") != "subagent"
                 and (meta.get("git") or {}).get("branch") == branch):
             return meta.get("id")
     return None
@@ -352,19 +356,37 @@ def record(name, spec):
             git("config", f"zw.{name}.{key}", spec[key])
 
 
-def recorded(name, started=""):
-    """How NAME's agent was started (SPEC), as `new` recorded it, else read
-    from the command a zellij tab STARTED it with (an agent from before zw
-    recorded it)."""
+def recorded(name, started="", agent=""):
+    """How NAME's agent was started (SPEC), as `new` recorded it. For an
+    agent from before zw recorded it: the AGENT seen running, or the one
+    the zellij tab was STARTED with, else whichever has the latest session
+    in the worktree on its branch (a tab started by typing into its shell
+    names none)."""
     spec = {key: git("config", "--get", f"zw.{name}.{key}") for key in SPEC}
     if not spec["agent"]:
         words = started.split()
-        spec["agent"] = program(started) or "claude"
+        spec["agent"] = agent or program(started) or latest_agent(name)
         for flag, key in (("--model", "model"), ("-m", "model"), ("--effort", "effort")):
             if flag in words[:-1]:
                 spec[key] = words[words.index(flag) + 1]
         record(name, spec)
     return spec
+
+
+def latest_agent(name):
+    """Claude or Codex, whichever's latest conversation in NAME's worktree,
+    on its branch, was written last."""
+    path, branch = target(name)
+    path = os.path.realpath(path)
+    home = os.environ.get("CODEX_HOME") or os.path.expanduser("~/.codex")
+    claude, codex = session_of(path, branch), codex_session_of(path, branch)
+    when = {
+        "claude": claude and os.path.getmtime(os.path.join(os.path.expanduser("~/.claude/projects"),
+                                              re.sub(r"[^A-Za-z0-9-]", "-", path), claude + ".jsonl")),
+        "codex": codex and max((os.path.getmtime(f) for f in glob.glob(
+            os.path.join(home, "sessions", "*", "*", "*", f"rollout-*{codex}.jsonl"))), default=0),
+    }
+    return max(("claude", "codex"), key=lambda a: when[a] or 0)
 
 
 def flags(spec):
@@ -404,7 +426,7 @@ def resuming(name, on, spec, path):
     branch = git("branch", "--show-current", cwd=path) or target(name)[1]
     found = (codex_session_of if agent == "codex" else session_of)(os.path.realpath(path), branch)
     if found is None:
-        sys.exit(f"No {agent} session on {branch} in {path}: resume it by hand.")
+        raise Stuck(f"No {agent} session on {branch} in {path}: resume it by hand.")
     if agent == "codex":
         # A first turn: Codex's hooks report only once one runs, and until
         # then nothing can tell its input from a menu on its screen.
@@ -590,7 +612,7 @@ def open_tab(name, path, command, replace=None):
         retire(replace)
 
 
-def start(name, on, path, left=None):
+def start(name, on, path, left=None, agent=""):
     """NAME's conversation, resumed on host ON. The zellij tab a quit agent
     LEFT (a tab record, by default zw's tab NAME) goes if it is zw's, with
     its Orca view from zw before Orca hosted agents."""
@@ -599,7 +621,7 @@ def start(name, on, path, left=None):
         left = found and {**found[0], "session": session(),
                           "started": found[1].get("terminal_command") or ""}
     started = left["started"] if left else ""
-    command = resuming(name, on, recorded(name, started), path)
+    command = resuming(name, on, recorded(name, started, agent), path)
     # Only a tab zw made for NAME holds nothing else of the person's.
     replace = left["tab_id"] if left and MARK_RE.sub("", left["name"]) == name else None
     if on == "orca":
@@ -651,7 +673,11 @@ def move(to, names):
             path = target(name)[0]
             close_views(lambda t: os.path.realpath(t.get("worktreePath", "")) == os.path.realpath(path)
                         and tab_of_terminal(t["handle"]) == running.tab)
-        start(name, to, target(name)[0], left=running.tab if running.host == "zellij" else None)
+        try:
+            start(name, to, target(name)[0], left=running.tab if running.host == "zellij" else None,
+                  agent=running.agent)
+        except Stuck as stuck:
+            print(f"{name}: quit, but not resumed: {stuck}", file=sys.stderr)
     print(f"New agents start in {to}.")
     if busy:
         print(f"Left where they are, not idle: {', '.join(busy)}. "
@@ -844,4 +870,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Stuck as stuck:
+        sys.exit(str(stuck))

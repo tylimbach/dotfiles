@@ -838,9 +838,17 @@ def status(state):
         zellij("rename-tab-by-id", str(tab), marked)
 
 
+NAMED = ("new", "add", "path", "go", "done", "resume", "msg")
+
+
 def main():
     args = sys.argv[1:]
     command, rest = (args[0], args[1:]) if args else ("", [])
+    if command in ("-h", "--help", "help") or "-h" in rest or "--help" in rest:
+        print(__doc__)
+        return
+    if command in NAMED and rest and rest[0].startswith("-"):
+        sys.exit(f"{rest[0]} is not a name: `zw {command}` takes NAME first (zw --help).")
     if command == "new" and rest:
         new(rest[0], rest[1:])
     elif command == "add" and len(rest) == 1:

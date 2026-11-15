@@ -23,9 +23,10 @@ host. One conversation never runs in two processes: each would keep its
 own history. Claude sessions are named NAME on either host (`--name`,
 `/rename`), the address other sessions message them by.
 
-  zw new NAME [--codex|--agy] [--model M] [--effort E] [-c] [ARGS...] [BRIEF]
+  zw new NAME [--codex|--agy] [--model M] [--effort E] [-c] [--focus] [ARGS...] [BRIEF]
                                    worktree + agent on the repo's host (-c resumes
-                                   NAME's conversation); a running NAME gets focus
+                                   NAME's conversation; --focus switches Orca to it);
+                                   a running NAME gets focus
   zw add NAME                      worktree only
   zw path NAME                     NAME's worktree directory
   zw go NAME                       focus NAME's agent
@@ -589,13 +590,15 @@ def new(name, args):
         return
     agent = "codex" if "--codex" in args else "agy" if {"--agy", "--antigravity"} & set(args) else "claude"
     spec = {"agent": agent}
-    rest, extra, resume_ = [a for a in args if a not in ("--codex", "--agy", "--antigravity")], [], False
+    rest, extra, resume_, focus_ = [a for a in args if a not in ("--codex", "--agy", "--antigravity")], [], False, False
     while rest:
         if rest[0] in ("--model", "--effort") and len(rest) >= 2:
             spec[rest[0][2:]], rest = rest[1], rest[2:]
             continue
         if rest[0] in ("-c", "--continue"):
             resume_ = True
+        elif rest[0] == "--focus":
+            focus_ = True
         else:
             extra.append(rest[0])
         rest = rest[1:]
@@ -604,26 +607,28 @@ def new(name, args):
         if extra:
             sys.exit(f"Orca starts agents with --model, --effort and a brief only, "
                      f"not {shlex.join(extra)}: `git config zw.host zellij` for those.")
-        launch(name, path, spec, brief)
+        launch(name, path, spec, brief, focus_=focus_)
         return
     record(name, spec)
     if resume_:
-        start(name, host(), path)
+        start(name, host(), path, focus_=focus_)
     else:
         own = {"codex": list(CODEX_FLAGS), "agy": list(AGY_FLAGS)}.get(agent, ["--name", name])
         prompt = (["-i", brief] if agent == "agy" else [brief]) if brief else []
         open_tab(name, path, [agent, *own, *flags(spec), *extra, *prompt])
 
 
-def launch(name, path, spec, brief):
+def launch(name, path, spec, brief, focus_=False):
     """A new agent in Orca, started as Orca starts one."""
     reachable(path)
     if spec.get("effort") and not spec.get("model"):
         sys.exit("Orca takes --effort only with --model.")
+    orca("worktree", "set", "--worktree", f"path:{path}", "--display-name", name)
     reply = orca("agent", "launch", "--agent", ORCA_AGENT[spec["agent"]], "--worktree", f"path:{path}",
                  *(["--model", spec["model"]] if spec.get("model") else []),
                  *(["--effort", spec["effort"]] if spec.get("effort") else []),
                  *(["--prompt", brief] if brief else []),
+                 *(["--focus"] if focus_ else []),
                  failing=f"`orca agent launch` failed for {name}")
     handle = (reply.get("outcome") or {}).get("handle")
     if handle is None:
@@ -672,7 +677,7 @@ def open_tab(name, path, command, replace=None):
         retire(replace)
 
 
-def start(name, on, path, left=None, agent=""):
+def start(name, on, path, left=None, agent="", focus_=False):
     """NAME's conversation, resumed on host ON. The zellij tab a quit agent
     LEFT (a tab record, by default zw's tab NAME) goes if it is zw's, with
     its Orca view from zw before Orca hosted agents."""
@@ -686,9 +691,14 @@ def start(name, on, path, left=None, agent=""):
     replace = left["tab_id"] if left and MARK_RE.sub("", left["name"]) == name else None
     if on == "orca":
         reachable(path)
+        orca("worktree", "set", "--worktree", f"path:{path}", "--display-name", name)
         shell = ["--shell", "git-bash"] if os.name == "nt" else []  # the command is POSIX-quoted
-        orca("terminal", "create", "--worktree", f"path:{path}", "--title", name, *shell,
-             "--command", shlex.join(command), failing=f"`orca terminal create` failed for {name}")
+        reply = orca("terminal", "create", "--worktree", f"path:{path}", "--title", name, *shell,
+                     "--command", shlex.join(command), failing=f"`orca terminal create` failed for {name}")
+        if focus_:
+            handle = ((reply or {}).get("terminal") or {}).get("handle")
+            if not (handle and orca("terminal", "switch", "--terminal", handle)):
+                orca("worktree", "activate", "--worktree", f"path:{path}")
         if replace is not None:
             retire(replace, left["session"])
     elif left and left["session"] != session():
@@ -865,6 +875,8 @@ def release(path, branch, main):
     """A landed task's worktree goes: a pooled one is detached for the next
     task, its build kept warm, unless the pool already has enough idle."""
     if pooled(path, main):
+        if not orca_unreachable():
+            orca("worktree", "set", "--worktree", f"path:{path}", "--display-name", "", "--comment", "")
         if not run("git", "switch", "-q", "--detach", cwd=path):
             sys.exit(1)
         run("git", "branch", "-D", branch, cwd=main)

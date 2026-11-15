@@ -10,13 +10,15 @@ terminal. One command moves every agent between the two.
 ## How it works
 - **The host** is the repo's `git config zw.host`: `orca`, or `zellij` (the
   default). `zw move orca` or `zw move zellij` sets it.
-- **`zw new NAME`** with Orca as the host makes the worktree, then has Orca
-  start the agent (`orca agent launch`), as its own launcher does: with
-  Orca's default arguments (Settings → Agents: Claude's and Antigravity's
-  `--dangerously-skip-permissions`, Codex's
+- **`zw new NAME [--focus]`** with Orca as the host makes the worktree, sets
+  its Orca display name to `NAME` (cleared on `zw done` for pooled slots),
+  then has Orca start the agent (`orca agent launch`), as its own launcher
+  does: with Orca's default arguments (Settings → Agents: Claude's and
+  Antigravity's `--dangerously-skip-permissions`, Codex's
   `--dangerously-bypass-approvals-and-sandbox`), the brief as its first
-  prompt. Orca takes `--model` and `--effort` (only an effort the model
-  supports) and the brief, nothing else.
+  prompt. Pass `--focus` only when starting work you want Orca to switch to
+  immediately. Orca takes `--model`, `--effort` (only an effort the model
+  supports), `--focus` and the brief, nothing else.
 - **Names:** a Claude session is named NAME (`--name`; through Orca,
   `/rename`, which applies once the brief's first turn ends). The name
   lives in the conversation, so it survives every resume and move; other

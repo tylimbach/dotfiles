@@ -491,19 +491,22 @@ def pane_of(name):
 
 def where(name):
     """NAME's agent, running now, or None. First an agent pane working in
-    NAME's worktree in any zellij session, whatever its tab is called;
-    else an agent Orca lists there. Zellij comes first because each agent
-    zw started there before Orca hosted agents reports to Orca from an Orca
-    terminal viewing its tab (Orca files it under whichever view is in the
-    worktree), and typing into a view types into whichever tab it shows."""
+    NAME's worktree in a zellij tab named NAME; else an agent Orca lists
+    there. Zellij comes first because each agent zw started there before Orca
+    hosted agents reports to Orca from an Orca terminal viewing its tab (Orca
+    files it under whichever view is in the worktree), and typing into a view
+    types into whichever tab it shows."""
     path = os.path.realpath(target(name)[0])
     for zsession in sessions():
+        session_tabs = tabs(zsession)
         for pane in json.loads(zellij("list-panes", "--json", capture=True, name=zsession) or "[]"):
             agent = program(pane.get("pane_command") or "")
             if (agent and not pane["is_plugin"] and not pane["is_floating"] and not pane["exited"]
                     and os.path.realpath(pane.get("pane_cwd") or "/") == path):
-                tab = next((t for t in tabs(zsession) if t["tab_id"] == pane["tab_id"]),
+                tab = next((t for t in session_tabs if t["tab_id"] == pane["tab_id"]),
                            {"name": "", "tab_id": pane["tab_id"]})
+                if MARK_RE.sub("", tab["name"]) != name:
+                    continue
                 mark = tab["name"][-1] if MARK_RE.search(tab["name"]) else ""
                 state = {"●": "working", "?": "waiting", "✓": "done"}.get(mark)
                 if state != "waiting" and agent == "claude":
@@ -585,10 +588,13 @@ def focus(running):
 
 def new(name, args):
     path = add(name)
-    if running := where(name):
-        focus(running)
-        return
     agent = "codex" if "--codex" in args else "agy" if {"--agy", "--antigravity"} & set(args) else "claude"
+    if running := where(name):
+        if running.agent != agent:
+            sys.exit(f"{name} is already running as {running.agent} in {running.host} (not {agent}).")
+        focus(running)
+        print(f"{name}: already running in {running.host} (focused)")
+        return
     spec = {"agent": agent}
     rest, extra, resume_, focus_ = [a for a in args if a not in ("--codex", "--agy", "--antigravity")], [], False, False
     while rest:

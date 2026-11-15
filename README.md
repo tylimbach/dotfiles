@@ -151,6 +151,7 @@ MSYS2 zsh), and says what's missing. Machine-only shell lines go in
   Its sandbox keeps a worktree's git data read-only (no writable root lifts it), so in `~/.codex/rules/default.rules` add one `prefix_rule(pattern=["git", "add"], decision="allow")` each for `add`, `commit` and `rebase`, or every commit in a worktree asks; an allowed command runs outside the sandbox unasked.
   Likewise `prefix_rule(pattern=["zw", "msg"], decision="allow")`, so messages between agents don't ask; check a rule with `codex execpolicy check -r FILE COMMAND...` (no `--`): a bad line silently voids the file.
   In `~/.codex/config.toml`, `check_for_update_on_startup = false`: the update offer Codex shows on starting takes the first text typed into it as an answer.
+- **Antigravity** (`~/.gemini/config/hooks.json`): `zw status working` on PreInvocation and PostToolUse, `done` on Stop (each printing `{}`).
 - In `~/.claude/settings.json`, add `"worktree": {"baseRef": "head"}`, so subagent worktrees branch from the session's branch (a story), not the default branch.
 - Add `@~/dev/dotfiles/claude/workflow.md` to `~/.claude/CLAUDE.md`: the orchestrator workflow, in every repo and worktree.
 - Project rules, skills and recipes (`CLAUDE.md`, `.claude/`, `justfile`) travel with each repo.

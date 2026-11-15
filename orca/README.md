@@ -12,7 +12,7 @@ terminal. One command moves every agent between the two.
   default). `zw move orca` or `zw move zellij` sets it.
 - **`zw new NAME`** with Orca as the host makes the worktree, then has Orca
   start the agent (`orca agent launch`), as its own launcher does: with
-  Orca's default arguments (Settings → Agents: Claude's
+  Orca's default arguments (Settings → Agents: Claude's and Antigravity's
   `--dangerously-skip-permissions`, Codex's
   `--dangerously-bypass-approvals-and-sandbox`), the brief as its first
   prompt. Orca takes `--model` and `--effort` (only an effort the model
@@ -25,12 +25,13 @@ terminal. One command moves every agent between the two.
   its conversation on HOST, in a zellij tab named NAME or an Orca terminal
   run as Orca would start it. The session is the worktree's latest on its
   branch: Claude's from its transcripts, Codex's from each transcript's
-  first line (`codex resume --last` can pick another worktree's). A
+  first line (`codex resume --last` can pick another worktree's),
+  Antigravity's (`--agy`) from `conversation_summaries.db`. A
   resumed Codex gets a one-line note as its first prompt: its hooks report
   only once a turn runs. Model and effort carry over (`git config
   zw.NAME.*`); other arguments and Orca's defaults don't.
 - **Idle** is what the hooks report: Orca's state; in zellij, Claude's own
-  (`claude agents`) or the tab's mark. A working agent, one waiting on a
+  (`claude agents`), Antigravity's summary DB, or the tab's mark. A working agent, one waiting on a
   question, or one not yet heard from stays put and is listed: rerun once
   it's idle.
 - **`zw msg NAME TEXT`** types into an agent on either host, the way

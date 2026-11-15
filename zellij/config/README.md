@@ -75,7 +75,7 @@ pooled worktree instead of removing it, past N idle the stalest goes, and
 
 | Command | Does |
 |------|--------|
-| `zw new NAME [--codex] [ARGS]` | Worktree + tab: the agent full-size, a hidden shell there (Alt+w) |
+| `zw new NAME [--codex|--agy] [ARGS]` | Worktree + tab: the agent full-size, a hidden shell there (Alt+w) |
 | `zw new NAME -c` | Reopen an existing worktree (zw's or Claude Code's `.claude/worktrees/NAME`), resuming its last session |
 | `zw go NAME` | Focus NAME's tab |
 | `zw path NAME` | Print NAME's worktree directory |

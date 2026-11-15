@@ -23,7 +23,7 @@ host. One conversation never runs in two processes: each would keep its
 own history. Claude sessions are named NAME on either host (`--name`,
 `/rename`), the address other sessions message them by.
 
-  zw new NAME [--codex] [--model M] [--effort E] [-c] [ARGS...] [BRIEF]
+  zw new NAME [--codex|--agy] [--model M] [--effort E] [-c] [ARGS...] [BRIEF]
                                    worktree + agent on the repo's host (-c resumes
                                    NAME's conversation); a running NAME gets focus
   zw add NAME                      worktree only
@@ -52,6 +52,7 @@ import os
 import re
 import shlex
 import shutil
+import sqlite3
 import subprocess
 import sys
 import time
@@ -73,8 +74,10 @@ ORCA_SETTINGS = [os.path.join(os.path.expanduser(folder), "orca", "profiles", "l
     "~/Library/Application Support", os.environ.get("APPDATA", "~/AppData/Roaming"),
     os.environ.get("XDG_CONFIG_HOME", "~/.config"))]
 HOSTS = ("orca", "zellij")
-AGENTS = ("claude", "codex")
-QUIT = {"claude": "/exit", "codex": "/quit"}
+AGENTS = ("claude", "codex", "agy")
+ORCA_AGENT = {"claude": "claude", "codex": "codex", "agy": "antigravity"}
+FROM_ORCA = {v: k for k, v in ORCA_AGENT.items()}
+QUIT = {"claude": "/exit", "codex": "/quit", "agy": "/exit"}
 # Agent states in which an agent waits on no one: quitting it loses no turn
 # and leaves no question unanswered.
 RESTING = ("done", "idle")
@@ -85,8 +88,11 @@ RESTING = ("done", "idle")
 TYPABLE = (*RESTING, "working")
 # Codex otherwise hands turns to a shared background server, which runs the
 # hooks in its own environment, so a zellij tab gets no marks. Orca's
-# terminals isolate Codex themselves.
-CODEX_FLAGS = ("--no-daemon",)
+# terminals isolate Codex themselves. A zw agent runs without approvals or a
+# sandbox, as Orca starts one (its Settings → Agents defaults), and only zw's
+# and Orca's do: the user's own `codex` and `agy` keep their config.
+CODEX_FLAGS = ("--no-daemon", "--dangerously-bypass-approvals-and-sandbox")
+AGY_FLAGS = ("--dangerously-skip-permissions",)
 # Codex's first prompt after a resume.
 MOVED = ("(zw: this conversation was resumed in {}. Nothing else changed: carry on, "
          "or if you were waiting for someone, keep waiting.)")
@@ -342,6 +348,38 @@ def codex_session_of(path, branch):
     return None
 
 
+def agy_row(path, branch=None):
+    """The latest Antigravity conversation (id, status, not_fully_idle, mtime)
+    in PATH on or after BRANCH was made, not a subagent's, or None."""
+    db = os.path.expanduser("~/.gemini/antigravity-cli/conversation_summaries.db")
+    if not os.path.exists(db):
+        return None
+    reflog = git("reflog", "show", "--format=%ct", branch, cwd=path).splitlines() if branch else []
+    born = int(reflog[-1]) if reflog and reflog[-1].isdigit() else 0
+    try:
+        with sqlite3.connect(f"file:{db}?mode=ro", uri=True) as conn:
+            rows = conn.execute(
+                "SELECT conversation_id, status, not_fully_idle, unixepoch(last_modified_time), "
+                "workspace_uris FROM conversation_summaries WHERE parent_conversation_id = '' "
+                "AND unixepoch(last_modified_time) >= ? ORDER BY last_modified_time DESC",
+                (born,)).fetchall()
+    except sqlite3.Error:
+        return None
+    for cid, status, busy, mtime, raw_uris in rows:
+        try:
+            uris = json.loads(raw_uris or "[]")
+        except (ValueError, TypeError):
+            continue
+        if any(os.path.realpath(u[len("file://"):]) == path for u in uris if u.startswith("file://")):
+            return cid, status, busy, mtime
+    return None
+
+
+def agy_session_of(path, branch):
+    row = agy_row(path, branch)
+    return row[0] if row else None
+
+
 def program(command):
     """The agent COMMAND runs, or "": the first word naming one (zellij gives
     the command as one string; the brief comes after it)."""
@@ -374,19 +412,20 @@ def recorded(name, started="", agent=""):
 
 
 def latest_agent(name):
-    """Claude or Codex, whichever's latest conversation in NAME's worktree,
-    on its branch, was written last."""
+    """Whichever agent's latest conversation in NAME's worktree, on its
+    branch, was written last."""
     path, branch = target(name)
     path = os.path.realpath(path)
     home = os.environ.get("CODEX_HOME") or os.path.expanduser("~/.codex")
-    claude, codex = session_of(path, branch), codex_session_of(path, branch)
+    claude, codex, agy = session_of(path, branch), codex_session_of(path, branch), agy_row(path, branch)
     when = {
         "claude": claude and os.path.getmtime(os.path.join(os.path.expanduser("~/.claude/projects"),
                                               re.sub(r"[^A-Za-z0-9-]", "-", path), claude + ".jsonl")),
         "codex": codex and max((os.path.getmtime(f) for f in glob.glob(
             os.path.join(home, "sessions", "*", "*", "*", f"rollout-*{codex}.jsonl"))), default=0),
+        "agy": agy and agy[3],
     }
-    return max(("claude", "codex"), key=lambda a: when[a] or 0)
+    return max(AGENTS, key=lambda a: when[a] or 0)
 
 
 def flags(spec):
@@ -400,14 +439,15 @@ def flags(spec):
 def orca_defaults(agent):
     """How Orca starts AGENT: its command and default arguments (Settings →
     Agents), so an agent resumed there runs as one Orca started."""
+    key = ORCA_AGENT.get(agent, agent)
     for path in ORCA_SETTINGS:
         try:
             with open(path, encoding="utf-8") as f:
                 settings = json.load(f)["settings"]
         except (OSError, ValueError, KeyError):
             continue
-        command = (settings.get("agentCmdOverrides") or {}).get(agent) or agent
-        arguments = (settings.get("agentDefaultArgs") or {}).get(agent) or ""
+        command = (settings.get("agentCmdOverrides") or {}).get(key) or agent
+        arguments = (settings.get("agentDefaultArgs") or {}).get(key) or ""
         return shlex.split(command), shlex.split(arguments)
     print(f"Couldn't read Orca's settings: {agent} starts without Orca's default arguments.",
           file=sys.stderr)
@@ -422,15 +462,19 @@ def resuming(name, on, spec, path):
     if on == "orca":
         command, arguments = orca_defaults(agent)
     else:
-        command, arguments = [agent], list(CODEX_FLAGS) if agent == "codex" else []
+        own = {"codex": CODEX_FLAGS, "agy": AGY_FLAGS}.get(agent, ())
+        command, arguments = [agent], list(own)
     branch = git("branch", "--show-current", cwd=path) or target(name)[1]
-    found = (codex_session_of if agent == "codex" else session_of)(os.path.realpath(path), branch)
+    find = {"codex": codex_session_of, "agy": agy_session_of}.get(agent, session_of)
+    found = find(os.path.realpath(path), branch)
     if found is None:
         raise Stuck(f"No {agent} session on {branch} in {path}: resume it by hand.")
     if agent == "codex":
         # A first turn: Codex's hooks report only once one runs, and until
         # then nothing can tell its input from a menu on its screen.
         return [*command, *arguments, *flags(spec), "resume", found, MOVED.format(on)]
+    if agent == "agy":
+        return [*command, *arguments, *flags(spec), "--conversation", found]
     return [*command, *arguments, "--name", name, *flags(spec), "--resume", found]
 
 
@@ -463,6 +507,8 @@ def where(name):
                 state = {"●": "working", "?": "waiting", "✓": "done"}.get(mark)
                 if state != "waiting" and agent == "claude":
                     state = claude_state(path) or state
+                elif state != "waiting" and agent == "agy":
+                    state = agy_state(path) or state
                 return Running("zellij", agent, state or "unknown", f"terminal_{pane['id']}",
                                {**tab, "session": zsession,
                                 "started": pane.get("terminal_command") or ""})
@@ -472,21 +518,21 @@ def where(name):
         if os.path.realpath(tree["path"]) != path:
             continue
         agents = [a for a in tree.get("agents", [])
-                  if not a.get("parentPaneKey") and a.get("agentType") in AGENTS]
+                  if not a.get("parentPaneKey") and FROM_ORCA.get(a.get("agentType")) in AGENTS]
         # `terminal list` names a terminal the window hasn't shown yet (a new
         # worktree's) by its pty; `show` gives its tab.
-        terminals = orca("terminal", "list", "--worktree", f"path:{path}")
+        terminals = (orca("terminal", "list", "--worktree", f"path:{path}") or {}).get("terminals", [])
         unheard = None
-        for listed in (terminals or {}).get("terminals", []):
+        for listed in sorted(terminals, key=lambda t: (t.get("title") != name, -(t.get("lastOutputAt") or 0))):
             terminal = (orca("terminal", "show", "--terminal", listed["handle"]) or {}).get("terminal", {})
             for agent in agents:
                 if agent["paneKey"].split(":")[0] == terminal.get("tabId"):
-                    return Running("orca", agent["agentType"], agent.get("state", ""),
+                    return Running("orca", FROM_ORCA[agent["agentType"]], agent.get("state", ""),
                                    listed["handle"], terminal["tabId"])
             # Orca sees the process before the agent's hooks report (Codex's
             # wait for its first turn): running, its state unknown.
-            if terminal.get("agentIdentity") in AGENTS:
-                unheard = unheard or Running("orca", terminal["agentIdentity"], "unknown",
+            if FROM_ORCA.get(terminal.get("agentIdentity")) in AGENTS:
+                unheard = unheard or Running("orca", FROM_ORCA[terminal["agentIdentity"]], "unknown",
                                              listed["handle"], terminal["tabId"])
         if unheard:
             return unheard
@@ -504,6 +550,18 @@ def claude_state(path):
     status = next((s.get("status") for s in listed if s.get("kind") == "interactive"
                    and os.path.realpath(s.get("cwd") or "/") == path), None)
     return {"idle": "done", "busy": "working"}.get(status, status)
+
+
+def agy_state(path):
+    """The state of the Antigravity session working in PATH, from its
+    conversation summary DB, or None."""
+    row = agy_row(path, git("branch", "--show-current", cwd=path))
+    if not row:
+        return None
+    _, status, busy, _ = row
+    if busy or status == "CASCADE_RUN_STATUS_RUNNING":
+        return "working"
+    return "done" if status == "CASCADE_RUN_STATUS_IDLE" else None
 
 
 def type_into(running, text):
@@ -529,8 +587,9 @@ def new(name, args):
     if running := where(name):
         focus(running)
         return
-    spec = {"agent": "codex" if "--codex" in args else "claude"}
-    rest, extra, resume_ = [a for a in args if a != "--codex"], [], False
+    agent = "codex" if "--codex" in args else "agy" if {"--agy", "--antigravity"} & set(args) else "claude"
+    spec = {"agent": agent}
+    rest, extra, resume_ = [a for a in args if a not in ("--codex", "--agy", "--antigravity")], [], False
     while rest:
         if rest[0] in ("--model", "--effort") and len(rest) >= 2:
             spec[rest[0][2:]], rest = rest[1], rest[2:]
@@ -551,8 +610,9 @@ def new(name, args):
     if resume_:
         start(name, host(), path)
     else:
-        own = list(CODEX_FLAGS) if spec["agent"] == "codex" else ["--name", name]
-        open_tab(name, path, [spec["agent"], *own, *flags(spec), *extra, *([brief] if brief else [])])
+        own = {"codex": list(CODEX_FLAGS), "agy": list(AGY_FLAGS)}.get(agent, ["--name", name])
+        prompt = (["-i", brief] if agent == "agy" else [brief]) if brief else []
+        open_tab(name, path, [agent, *own, *flags(spec), *extra, *prompt])
 
 
 def launch(name, path, spec, brief):
@@ -560,7 +620,7 @@ def launch(name, path, spec, brief):
     reachable(path)
     if spec.get("effort") and not spec.get("model"):
         sys.exit("Orca takes --effort only with --model.")
-    reply = orca("agent", "launch", "--agent", spec["agent"], "--worktree", f"path:{path}",
+    reply = orca("agent", "launch", "--agent", ORCA_AGENT[spec["agent"]], "--worktree", f"path:{path}",
                  *(["--model", spec["model"]] if spec.get("model") else []),
                  *(["--effort", spec["effort"]] if spec.get("effort") else []),
                  *(["--prompt", brief] if brief else []),

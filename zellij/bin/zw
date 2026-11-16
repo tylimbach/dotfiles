@@ -629,7 +629,8 @@ def launch(name, path, spec, brief, focus_=False):
     reachable(path)
     if spec.get("effort") and not spec.get("model"):
         sys.exit("Orca takes --effort only with --model.")
-    orca("worktree", "set", "--worktree", f"path:{path}", "--display-name", name)
+    orca("worktree", "set", "--worktree", f"path:{path}", "--display-name", name,
+         "--workspace-status", "in-progress", "--comment", "")
     reply = orca("agent", "launch", "--agent", ORCA_AGENT[spec["agent"]], "--worktree", f"path:{path}",
                  *(["--model", spec["model"]] if spec.get("model") else []),
                  *(["--effort", spec["effort"]] if spec.get("effort") else []),
@@ -697,7 +698,8 @@ def start(name, on, path, left=None, agent="", focus_=False):
     replace = left["tab_id"] if left and MARK_RE.sub("", left["name"]) == name else None
     if on == "orca":
         reachable(path)
-        orca("worktree", "set", "--worktree", f"path:{path}", "--display-name", name)
+        orca("worktree", "set", "--worktree", f"path:{path}", "--display-name", name,
+             "--workspace-status", "in-progress", "--comment", "")
         shell = ["--shell", "git-bash"] if os.name == "nt" else []  # the command is POSIX-quoted
         reply = orca("terminal", "create", "--worktree", f"path:{path}", "--title", name, *shell,
                      "--command", shlex.join(command), failing=f"`orca terminal create` failed for {name}")

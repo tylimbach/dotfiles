@@ -58,6 +58,10 @@ npm install
 
   npm install -g mcp-hub@latest
 
+brew (macOS): language servers for Claude Code's LSP plugins
+
+    brew install pyright lua-language-server
+
 WSL2
 
 cargo

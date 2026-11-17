@@ -64,22 +64,23 @@ The trace's timings are spans, one event kind for anything timed:
 
 The names are OpenTelemetry's. Every other field is a tag, kept under
 `attributes`: an emitter adds one without a change here. A value that
-reads as a number is one; --json gives lists and nested tags. A span
-without IDs gets its own, as a child of the span TRACEPARENT names (W3C
-trace context, as OpenTelemetry passes it through the environment): a
-process that times a span and runs a child sets TRACEPARENT to
-00-TRACE_ID-SPAN_ID-01 for it. `zw emit step`, and a `step` line already
-in a log, is a span: its group a tag, its seconds the duration, PASS,
-FAIL and SKIP as OK, ERROR and UNSET.
+reads as a number is one. --json gives lists and nested tags, and under
+its `attributes` a tag of any name, one of the span's own included. A
+span without IDs gets its own, as a child of the span TRACEPARENT names
+(W3C trace context, as OpenTelemetry passes it through the environment):
+a process that times a span and runs a child sets TRACEPARENT to
+00-TRACE_ID-SPAN_ID-01 for it.
 
-In `zw report --spans`, KEY is a tag (`game_ms.shown` for one inside
-another), one of a span's own fields (name, status, trace_id, ...), one
-of the event's (task, branch, worktree, session) or `day`, its start's
-local date. `--where KEY=VALUE` keeps the spans whose KEY is VALUE, or
-holds it in a list; `--where task=` those in no task. WHEN is a number of
-days ago or an ISO date or time. Durations are of the spans that ran (OK
-and ERROR); `--where status=OK` leaves the passes. `--tree` draws each
-matching span with the spans under it, a run end to end.
+In `zw report --spans`, KEY is `day`, a span's start's local date; one of
+its own fields (name, status, trace_id, ...) or its event's (task,
+branch, worktree, session); else a tag, `game_ms.shown` for one inside
+another and `attributes.name` for one that shares a name with those.
+`--where KEY=VALUE` keeps the spans whose KEY is VALUE, or holds it in a
+list; `--where KEY=` those without KEY or with nothing in it (`task=`: in
+no task). WHEN is a number of days ago or an ISO date or time; `--until`
+a date takes in that day. Durations and loads are of the spans that ran
+(OK and ERROR); `--where status=OK` leaves the passes. `--tree` draws
+each matching span with the spans under it, a run end to end.
 """
 import argparse
 import collections
@@ -160,9 +161,8 @@ ENVELOPE = ("ts", "kind", "task", "session", "branch", "worktree", "pid")
 # of its timestamps.
 SPAN_FIELDS = ("name", "trace_id", "span_id", "parent_span_id", "start", "duration", "status")
 SPAN_IDS = ("trace_id", "span_id", "parent_span_id")
-# OpenTelemetry's status codes, and a `step` event's words for them.
+# OpenTelemetry's status codes.
 STATUSES = ("OK", "ERROR", "UNSET")
-STEP_STATUS = {"PASS": "OK", "FAIL": "ERROR", "SKIP": "UNSET"}
 # W3C trace context's `traceparent`: version, trace ID, parent span ID, flags.
 TRACEPARENT = re.compile(r"^[0-9a-f]{2}-([0-9a-f]{32})-([0-9a-f]{16})-[0-9a-f]{2}$")
 
@@ -339,24 +339,22 @@ def provider_versions():
 
 def span_fields(fields):
     """An emitter's fields as a span's: its own under their names, every
-    other one a tag. A `step` event's `seconds` is the duration and its
-    PASS, FAIL and SKIP the status."""
+    other one a tag, with those under `attributes`, whatever their names."""
     tags = fields.get("attributes")
     tags = dict(tags) if isinstance(tags, dict) else {}
     tags.update((key, value) for key, value in fields.items()
-                if key not in SPAN_FIELDS and key not in ("attributes", "seconds"))
+                if key not in SPAN_FIELDS and key != "attributes")
     try:
-        duration = float(fields.get("duration", fields.get("seconds")) or 0.0)
+        duration = float(fields.get("duration") or 0.0)
     except (TypeError, ValueError):
         duration = 0.0
     if not math.isfinite(duration) or duration < 0:
         duration = 0.0
-    status = str(fields.get("status") or "").upper()
+    status = fields.get("status")
     span = {"name": str(fields.get("name") or "")}
     span.update((key, str(fields[key])) for key in SPAN_IDS if fields.get(key))
     span.update(start=fields.get("start") or None, duration=duration,
-                status=STEP_STATUS.get(status, status if status in STATUSES else "UNSET"),
-                attributes=tags)
+                status=status if status in STATUSES else "UNSET", attributes=tags)
     return span
 
 
@@ -393,7 +391,7 @@ def emit_cli(args):
         if not args or args[0].startswith("-"):
             return
         kind = args[0]
-        extra = {}
+        given, extra = {}, {}
         i = 1
         while i < len(args):
             arg = args[i]
@@ -418,10 +416,12 @@ def emit_cli(args):
             if "=" in arg:
                 k, v = arg.split("=", 1)
                 # A span's name, IDs, start and status are text whatever they hold.
-                extra[k] = v if k in SPAN_FIELDS and k != "duration" else _typed(v)
+                given[k] = v if k in SPAN_FIELDS and k != "duration" else _typed(v)
             i += 1
-        if kind in ("span", "step"):
-            kind, extra = "span", new_span(extra, os.environ.get("TRACEPARENT"))
+        # What `key=value` gives stands over --json's: a span's own fields are its emitter's.
+        extra.update(given)
+        if kind == "span":
+            extra = new_span(extra, os.environ.get("TRACEPARENT"))
         emit_event(kind, extra)
     except Exception:
         pass
@@ -710,10 +710,8 @@ def logged_events():
 
 
 def span_of(event):
-    """An event as a span, or None for another kind: a `step` line, what
-    emitters wrote before spans, reads as one."""
-    kind = event.get("kind")
-    if kind not in ("span", "step"):
+    """An event as a span, or None for another kind."""
+    if event.get("kind") != "span":
         return None
     span = span_fields({key: value for key, value in event.items() if key not in ENVELOPE})
     return {**{key: event.get(key) for key in ENVELOPE}, "kind": "span", **span}
@@ -734,14 +732,17 @@ def _text(value):
 
 
 def span_value(span, key):
-    """A span's value for KEY: a tag (dotted for one inside another), else
-    its own field or its event's; `day` is its start's local date."""
+    """A span's value for KEY: `day`, its start's local date; one of its
+    own fields or its event's; else a tag, dotted for one inside another.
+    `attributes.KEY` is the tag where a tag shares one of those names."""
     if key == "day":
         return span_start(span).astimezone().date().isoformat()
+    if key in SPAN_FIELDS or key in ENVELOPE:
+        return span.get(key)
     value = span["attributes"]
-    for part in key.split("."):
+    for part in key.removeprefix("attributes.").split("."):
         value = value.get(part) if isinstance(value, dict) else None
-    return span.get(key) if value is None else value
+    return value
 
 
 def span_stats(spans):
@@ -749,7 +750,7 @@ def span_stats(spans):
     durations of those that ran, with the median load they ran under."""
     ran = sorted((s for s in spans if s["status"] != "UNSET"), key=span_start)
     durations = sorted(s["duration"] for s in ran)
-    loads = sorted(load for load in (s["attributes"].get("load") for s in spans)
+    loads = sorted(load for load in (s["attributes"].get("load") for s in ran)
                    if isinstance(load, (int, float)) and not isinstance(load, bool))
 
     def median(values):
@@ -768,17 +769,21 @@ def span_stats(spans):
     }
 
 
-def _when(text, now):
+def _when(text, now, ending=False):
     """`--since` and `--until`: a number of days ago, or an ISO date or
-    time (local without an offset)."""
+    time (local without an offset); a date `ending` a window is its last
+    moment."""
     try:
         return now - datetime.timedelta(days=float(text))
-    except ValueError:
+    except (ValueError, OverflowError):
         pass
     try:
-        return datetime.datetime.fromisoformat(text.replace("Z", "+00:00")).astimezone()
+        when = datetime.datetime.fromisoformat(text.replace("Z", "+00:00")).astimezone()
     except ValueError:
         sys.exit(f"{text} is neither a number of days ago nor an ISO date or time.")
+    if ending and re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
+        when += datetime.timedelta(days=1, microseconds=-1)
+    return when
 
 
 def _seconds(value):
@@ -789,31 +794,37 @@ def _seconds(value):
 
 def span_trees(matching, spans):
     """Each matching span no other matching span is above, with the spans
-    under it, by start."""
+    under it, by start. A span is known by its trace and its ID together:
+    an ID is unique in its trace alone."""
+    def own(span):
+        return span.get("span_id") and (span.get("trace_id"), span["span_id"])
+
+    def above(span):
+        return span.get("parent_span_id") and (span.get("trace_id"), span["parent_span_id"])
+
     children = collections.defaultdict(list)
     by_id = {}
     for span in spans:
-        if span.get("span_id"):
-            by_id[span["span_id"]] = span
-        if span.get("parent_span_id"):
-            children[span["parent_span_id"]].append(span)
+        if own(span):
+            by_id[own(span)] = span
+        if above(span):
+            children[above(span)].append(span)
     chosen = {id(span) for span in matching}
 
     def under_another(span):
         seen = set()
-        while (parent := by_id.get(span.get("parent_span_id"))) and id(parent) not in seen:
+        while (parent := by_id.get(above(span))) and id(parent) not in seen:
             if id(parent) in chosen:
                 return True
             seen.add(id(parent))
             span = parent
         return False
 
-    def tree(span, above):
-        below = [] if span.get("span_id") in above else sorted(
-            children.get(span.get("span_id"), ()), key=span_start)
+    def tree(span, ancestors):
+        below = [] if own(span) in ancestors else sorted(children.get(own(span), ()), key=span_start)
         return {**{key: span.get(key) for key in (*SPAN_FIELDS, "attributes", "task")},
                 "start": _format_ts(span_start(span).astimezone(datetime.timezone.utc)),
-                "children": [tree(child, above | {span.get("span_id")}) for child in below]}
+                "children": [tree(child, ancestors | {own(span)}) for child in below]}
 
     return [tree(span, frozenset()) for span in sorted(matching, key=span_start)
             if not under_another(span)]
@@ -824,13 +835,16 @@ def span_report(prefix=None, where=(), by=None, since=None, until=None, as_tree=
     """The spans of every task and of none: filtered by name prefix, tags
     and a time window, then a row per `by` value, or drawn as trees."""
     now = _utc_now()
-    since, until = since and _when(since, now), until and _when(until, now)
+    since, until = since and _when(since, now), until and _when(until, now, ending=True)
     conditions = []
     for condition in where:
         key, equals, wanted = condition.partition("=")
         if not equals:
             sys.exit(f"--where {condition}: give KEY=VALUE (KEY= for spans without KEY).")
         conditions.append((key, wanted))
+    keys = by.split(",") if by else None
+    if keys and (len(set(keys)) < len(keys) or "" in keys):
+        sys.exit(f"--by {by}: give each KEY once, separated by commas.")
     spans = [span for span in map(span_of, logged_events()) if span is not None]
 
     def matches(span):
@@ -840,7 +854,9 @@ def span_report(prefix=None, where=(), by=None, since=None, until=None, as_tree=
             return False
         for key, wanted in conditions:
             value = span_value(span, key)
-            if wanted not in (map(_text, value) if isinstance(value, list) else (_text(value),)):
+            # A list holds the value wanted; an empty one, like no tag, holds "".
+            held = [_text(item) for item in value] if isinstance(value, list) else [_text(value)]
+            if wanted not in (held or [""]):
                 return False
         return True
 
@@ -867,7 +883,7 @@ def span_report(prefix=None, where=(), by=None, since=None, until=None, as_tree=
         return
 
     # One name left is read over time; several, beside each other.
-    keys = by.split(",") if by else ["day"] if len({s["name"] for s in matching}) == 1 else ["name"]
+    keys = keys or (["day"] if len({s["name"] for s in matching}) == 1 else ["name"])
     groups = collections.defaultdict(list)
     for span in matching:
         groups[tuple(_text(span_value(span, key)) or "-" for key in keys)].append(span)

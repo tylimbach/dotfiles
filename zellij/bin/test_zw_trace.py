@@ -44,18 +44,19 @@ def event(ts, kind, task=None, **fields):
             "worktree": "/w", "pid": 1, **fields}
 
 
-def step(start, name, seconds, status="PASS", task=None, group="build", **extra):
-    """A line as emitters wrote it before spans."""
-    return event(start, "step", task, group=group, name=name, start=start, seconds=seconds,
-                 status=status, **extra)
-
-
-def span(start, name, duration, status="OK", task=None, span_id=None, parent=None, **tags):
-    ids = {"trace_id": "ab" * 16, "span_id": span_id or os.urandom(8).hex()}
+def span(start, name, duration, status="OK", task=None, span_id=None, parent=None,
+         trace="ab" * 16, **tags):
+    ids = {"trace_id": trace, "span_id": span_id or os.urandom(8).hex()}
     if parent:
         ids["parent_span_id"] = parent
     return event(start, "span", task, name=name, **ids, start=start, duration=duration,
                  status=status, attributes=tags)
+
+
+def step(start, name, seconds):
+    """A `step` line, which logs written before spans hold: no span."""
+    return event(start, "step", None, group="build", name=name, start=start, seconds=seconds,
+                 status="PASS", load=1.0)
 
 
 def span_report(log, *args):
@@ -151,6 +152,34 @@ class ZwTraceTests(unittest.TestCase):
                                                 "reason": "game died", "crates": ["a", "b"],
                                                 "game_ms": {"shown": 315.0}})
 
+    def test_a_tag_named_as_one_of_a_span_s_own_fields_stays_a_tag(self):
+        with tempfile.TemporaryDirectory() as d:
+            log = pathlib.Path(d) / "events.jsonl"
+            # Tags go under --json's `attributes`, where any name is a tag's; the span's own
+            # fields are what `key=value` gave, whatever --json says beside them.
+            tags = {"name": "a tag", "status": "PASS", "start": "never", "duration": "long",
+                    "seconds": 3, "span_id": "f" * 16, "trace_id": "f" * 32,
+                    "parent_span_id": "f" * 16, "attributes": {"nested": 1}}
+            ev = emitted(log, "span", "name=build", "start=2026-11-16T10:00:00.000Z", "duration=2.5",
+                         "status=OK", "trace_id=" + "1" * 32, "span_id=" + "2" * 16, "seconds=9",
+                         "--json", json.dumps({"attributes": tags, "name": "not this",
+                                               "status": "ERROR", "duration": 99}))
+            self.assertEqual({k: ev.get(k) for k in ("name", "trace_id", "span_id", "parent_span_id",
+                                                     "start", "duration", "status")},
+                             {"name": "build", "trace_id": "1" * 32, "span_id": "2" * 16,
+                              "parent_span_id": None, "start": "2026-11-16T10:00:00.000Z",
+                              "duration": 2.5, "status": "OK"})
+            # `seconds` is no field of a span's: given beside the tags, it is one more.
+            self.assertEqual(ev["attributes"], {**tags, "seconds": 9})
+            # And they read back as tags, the span's own fields still its own: a report
+            # groups by its name, and reaches a tag of that name as `attributes.name`.
+            self.assertEqual(span_report(log, "--where", "seconds=9")["total"]["count"], 1)
+            self.assertEqual(span_report(log, "--by", "name")["rows"][0]["key"], {"name": "build"})
+            self.assertEqual(span_report(log, "--where", "status=OK", "--where", "attributes.status=PASS",
+                                         "--by", "attributes.name,attributes.attributes.nested"
+                                         )["rows"][0]["key"],
+                             {"attributes.name": "a tag", "attributes.attributes.nested": "1"})
+
     def test_a_span_without_ids_gets_its_own_under_the_one_traceparent_names(self):
         with tempfile.TemporaryDirectory() as d:
             log = pathlib.Path(d) / "events.jsonl"
@@ -174,17 +203,25 @@ class ZwTraceTests(unittest.TestCase):
             self.assertEqual((own["trace_id"], own["span_id"]), ("9" * 32, "8" * 16))
             self.assertNotIn("parent_span_id", own)
 
-    def test_a_step_emitted_is_written_as_a_span(self):
+    def test_only_a_span_is_a_span(self):
         with tempfile.TemporaryDirectory() as d:
             log = pathlib.Path(d) / "events.jsonl"
-            ev = emitted(log, "step", "group=check", "name=clippy", "start=2026-11-16T10:00:00.000Z",
-                         "seconds=12.5", "status=FAIL", "load=3.25", "--json", '{"recipe":"check"}')
-            self.assertEqual((ev["kind"], ev["name"], ev["duration"], ev["status"]),
-                             ("span", "clippy", 12.5, "ERROR"))
-            self.assertEqual(ev["attributes"], {"group": "check", "load": 3.25, "recipe": "check"})
-            self.assertNotIn("seconds", ev)
-            self.assertEqual([emitted(log, "step", "name=x", f"status={word}")["status"]
-                              for word in ("PASS", "SKIP", "nonsense")], ["OK", "UNSET", "UNSET"])
+            # Another kind is written as given: no IDs, no tags.
+            ev = emitted(log, "step", "group=check", "name=clippy", "seconds=12.5", "status=PASS")
+            self.assertEqual({k: v for k, v in ev.items() if k not in ("ts", "pid", "session", "branch",
+                                                                       "worktree")},
+                             {"kind": "step", "task": "t-1", "group": "check", "name": "clippy",
+                              "seconds": 12.5, "status": "PASS"})
+            # A status is one of OpenTelemetry's three, as written, or the span's is unset.
+            self.assertEqual([emitted(log, "span", "name=x", f"status={word}")["status"]
+                              for word in ("OK", "ERROR", "UNSET", "PASS", "ok")],
+                             ["OK", "ERROR", "UNSET", "UNSET", "UNSET"])
+            # Neither report reads the `step` line: six events, five spans.
+            self.assertEqual(span_report(log)["total"]["count"], 5)
+            per_task = subprocess.run([ZW_PATH, "report", "t-1", "--json"], env=clean_env(ZW_LOG=str(log)),
+                                      capture_output=True, text=True, check=True)
+            self.assertEqual(json.loads(per_task.stdout)[0]["spans"],
+                             {"other": {"count": 5, "sum_seconds": 0.0, "union_seconds": 0.0}})
 
     def test_task_resolution_order(self):
         with tempfile.TemporaryDirectory() as d:
@@ -224,12 +261,13 @@ class ZwTraceTests(unittest.TestCase):
                  "session": None, "branch": "agent/foo", "worktree": d, "pid": 2, "state": "working"},
                 {"ts": "2026-11-16T10:00:30.000Z", "kind": "agent.state", "task": "foo-20261116T100000Z",
                  "session": None, "branch": "agent/foo", "worktree": d, "pid": 2, "state": "done"},
-                # Overlapping in group 'check', a `step` line as logs already hold and a span:
-                # [10..20] (10s) and [14..24] (10s) -> sum 20s, union 14s
-                {"ts": "2026-11-16T10:00:20.000Z", "kind": "step", "task": "foo-20261116T100000Z",
+                # Overlapping spans in group 'check': [10..20] (10s) and [14..24] (10s)
+                # -> sum 20s, union 14s
+                {"ts": "2026-11-16T10:00:20.000Z", "kind": "span", "task": "foo-20261116T100000Z",
                  "session": None, "branch": "agent/foo", "worktree": d, "pid": 3,
-                 "group": "check", "name": "clippy", "start": "2026-11-16T10:00:10.000Z",
-                 "seconds": 10.0, "status": "PASS", "load": 1.0},
+                 "name": "clippy", "trace_id": "ab" * 16, "span_id": "12" * 8,
+                 "start": "2026-11-16T10:00:10.000Z", "duration": 10.0, "status": "OK",
+                 "attributes": {"group": "check", "load": 1.0}},
                 {"ts": "2026-11-16T10:00:24.000Z", "kind": "span", "task": "foo-20261116T100000Z",
                  "session": None, "branch": "agent/foo", "worktree": d, "pid": 4,
                  "name": "test", "trace_id": "ab" * 16, "span_id": "cd" * 8,
@@ -266,14 +304,15 @@ class ZwTraceTests(unittest.TestCase):
             self.assertEqual(rep["msgs"], 1)
             self.assertEqual(rep["tokens"], "n/a (phase 2)")
 
-    def test_span_report_reads_steps_and_spans_as_one_set_across_tasks_and_none(self):
+    def test_span_report_shows_one_name_s_trend_across_tasks_and_none(self):
         with tempfile.TemporaryDirectory() as d:
-            # One name over three days: old `step` lines and spans, in two tasks and in none.
+            # One name over three days, in two tasks and in none; a `step` line is no span.
             log = write_log(d, [
-                step("2026-11-14T10:00:00.000Z", "_build studio", 10.0, task="a-1", load=2.0),
-                step("2026-11-14T11:00:00.000Z", "_build studio", 20.0, "FAIL", task="a-1", load=4.0),
-                step("2026-11-15T10:00:00.000Z", "_build studio", 30.0, load=6.0),
-                step("2026-11-15T11:00:00.000Z", "_build studio", 0.0, "SKIP", load=50.0),
+                span("2026-11-14T10:00:00.000Z", "_build studio", 10.0, task="a-1", load=2.0),
+                span("2026-11-14T11:00:00.000Z", "_build studio", 20.0, "ERROR", task="a-1", load=4.0),
+                span("2026-11-15T10:00:00.000Z", "_build studio", 30.0, load=6.0),
+                span("2026-11-15T11:00:00.000Z", "_build studio", 0.0, "UNSET", load=50.0),
+                step("2026-11-15T12:00:00.000Z", "_build studio", 999.0),
                 span("2026-11-16T10:00:00.000Z", "_build studio", 40.0, group="build", load=8.0),
                 span("2026-11-16T11:00:00.000Z", "_build studio", 50.0, task="b-1", group="build",
                      load=10.0),
@@ -287,20 +326,20 @@ class ZwTraceTests(unittest.TestCase):
                              [("_build studio", 6), ("launch studio", 1)])
             self.assertEqual(names["total"]["count"], 7)
 
-            # One name: its trend, a row per day. A span that never ran (UNSET) is counted
-            # but has no duration; the median load is of every span's.
+            # One name: its trend, a row per day. A span that never ran (UNSET) is counted,
+            # but neither its duration nor the load it didn't run under.
             trend = span_report(log, "_build")
             self.assertEqual(trend["by"], ["day"])
             self.assertEqual(trend["rows"], [
                 {"key": {"day": "2026-11-14"}, "count": 2, "ok": 1, "error": 1,
                  "median": 15.0, "p90": 20.0, "latest": 20.0, "load": 3.0},
                 {"key": {"day": "2026-11-15"}, "count": 2, "ok": 1, "error": 0,
-                 "median": 30.0, "p90": 30.0, "latest": 30.0, "load": 28.0},
+                 "median": 30.0, "p90": 30.0, "latest": 30.0, "load": 6.0},
                 {"key": {"day": "2026-11-16"}, "count": 2, "ok": 2, "error": 0,
                  "median": 45.0, "p90": 50.0, "latest": 50.0, "load": 9.0},
             ])
             self.assertEqual(trend["total"], {"count": 6, "ok": 4, "error": 1, "median": 30.0,
-                                              "p90": 50.0, "latest": 50.0, "load": 7.0})
+                                              "p90": 50.0, "latest": 50.0, "load": 6.0})
 
             # In no task (the person's own runs), and by task.
             mine = span_report(log, "_build studio", "--where", "task=")
@@ -313,7 +352,7 @@ class ZwTraceTests(unittest.TestCase):
     def test_span_report_filters_and_groups_by_any_tag_and_a_window(self):
         with tempfile.TemporaryDirectory() as d:
             log = write_log(d, [
-                step("2026-11-14T10:00:00.000Z", "_build studio", 100.0, recipe="studio",
+                span("2026-11-14T10:00:00.000Z", "_build studio", 100.0, recipe="studio",
                      crates=["purge_frontend", "purge-game"]),
                 span("2026-11-15T10:00:00.000Z", "_build studio", 2.0, group="build", recipe="studio",
                      crates=["purge_model_studio", "purge-game"]),
@@ -337,9 +376,16 @@ class ZwTraceTests(unittest.TestCase):
             self.assertEqual(names("--where", "crates=purge_frontend"), ["_build studio"])
             self.assertEqual(names("--where", "game_ms.shown=2166.0"), ["launch gpu studio game-shown"])
             self.assertEqual(names("--where", "status=ERROR"), ["studio-hot patch"])
-            # A window: ISO times, or days ago.
+            # `KEY=` is the spans without the tag or with nothing in it: a build of no crate.
+            self.assertEqual(names("--where", "crates="),
+                             ["_build gpu studio", "launch gpu studio game-shown", "studio-hot patch"])
+            self.assertEqual(names("--where", "crates=", "--where", "group=build", "--where", "reason="),
+                             ["_build gpu studio"])
+            # A window: ISO times, or days ago; a date it ends on is taken in whole.
             self.assertEqual(names("--since", "2026-11-15T00:00:00Z", "--until", "2026-11-16T10:00:01Z"),
                              ["_build gpu studio", "_build studio"])
+            self.assertEqual(names("--since", "2026-11-15", "--until", "2026-11-15"), ["_build studio"])
+            self.assertEqual(len(names("--until", "2026-11-16")), 4)
             self.assertEqual(names("--since", "0.001"), [])
             self.assertEqual(len(names("--since", "36500")), 4)
 
@@ -360,7 +406,11 @@ class ZwTraceTests(unittest.TestCase):
                 span("2026-11-16T10:00:00.000Z", "gpu studio", 13.0, span_id="a" * 16, recipe="gpu studio"),
                 span("2026-11-16T11:00:00.000Z", "gpu studio", 9.0, "ERROR", span_id="d" * 16),
                 span("2026-11-16T12:00:00.000Z", "check", 9.0, span_id="e" * 16),
-                step("2026-11-16T09:00:00.000Z", "gpu studio", 1.0),
+                span("2026-11-16T09:00:00.000Z", "gpu studio", 1.0),
+                # Another trace's span with an ID seen above: an ID is its trace's alone.
+                span("2026-11-16T09:00:00.000Z", "gpu studio", 2.0, span_id="a" * 16, trace="cd" * 16),
+                span("2026-11-16T09:00:01.000Z", "_build gpu studio", 0.5, parent="a" * 16,
+                     trace="cd" * 16),
             ])
 
             def shape(nodes):
@@ -368,6 +418,7 @@ class ZwTraceTests(unittest.TestCase):
 
             self.assertEqual(shape(span_report(log, "gpu studio", "--tree")), [
                 ("gpu studio", 1.0, []),
+                ("gpu studio", 2.0, [("_build gpu studio", 0.5, [])]),
                 ("gpu studio", 13.0, [("_build gpu studio", 4.0, []),
                                       ("launch gpu studio game-shown", 6.0, [])]),
                 ("gpu studio", 9.0, []),
@@ -387,10 +438,10 @@ class ZwTraceTests(unittest.TestCase):
                 "                       launch gpu studio game-shown  6.00s OK  group=other",
             ])
 
-    def test_span_report_table_and_the_per_task_view_s_refusal(self):
+    def test_span_report_table_and_what_it_refuses(self):
         with tempfile.TemporaryDirectory() as d:
             log = write_log(d, [
-                step("2026-11-15T10:00:00.000Z", "_build studio", 2.0, load=6.0),
+                span("2026-11-15T10:00:00.000Z", "_build studio", 2.0, load=6.0),
                 span("2026-11-16T10:00:00.000Z", "_build studio", 113.2, group="build", load=8.0),
             ])
             env = clean_env(ZW_LOG=str(log), TZ="UTC")
@@ -410,6 +461,16 @@ class ZwTraceTests(unittest.TestCase):
                                      capture_output=True, text=True)
             self.assertNotEqual(refused.returncode, 0)
             self.assertIn("zw report --spans", refused.stderr)
+            # What can't be read is refused in a line, not a traceback.
+            for args, names in ((["--by", "name,name"], "--by name,name"), (["--by", "name,"], "--by"),
+                                (["--since", "inf"], "inf"), (["--since", "1e9"], "1e9"),
+                                (["--until", "nan"], "nan"), (["--since", "yesterday"], "yesterday"),
+                                (["--where", "group"], "--where group")):
+                refused = subprocess.run([ZW_PATH, "report", "--spans", *args], env=env,
+                                         capture_output=True, text=True)
+                self.assertEqual((refused.returncode, refused.stdout), (1, ""), args)
+                self.assertEqual(len(refused.stderr.splitlines()), 1, refused.stderr)
+                self.assertIn(names, refused.stderr)
 
     def test_claude_dedup_and_subagents(self):
         with tempfile.TemporaryDirectory() as d:

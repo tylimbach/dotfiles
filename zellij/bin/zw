@@ -268,6 +268,26 @@ def emit_event(kind, extra=None, *, cwd=None, task=_UNSET, session=_UNSET, branc
         pass
 
 
+def _mint_task_id(name):
+    return f"{name}-{_utc_now().strftime('%Y%m%dT%H%M%SZ')}"
+
+
+def _provider_version(cmd):
+    try:
+        out = subprocess.run([cmd, "--version"], capture_output=True, encoding="utf-8", timeout=2)
+        if out.returncode == 0:
+            line = out.stdout.strip().splitlines()[0].strip() if out.stdout.strip() else ""
+            return line or None
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return None
+
+
+def provider_versions():
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(AGENTS)) as pool:
+        return dict(zip(AGENTS, pool.map(_provider_version, AGENTS)))
+
+
 def emit_cli(args):
     try:
         if not args or args[0].startswith("-"):
@@ -816,26 +836,43 @@ def new(name, args):
             extra.append(rest[0])
         rest = rest[1:]
     brief = extra.pop() if extra and not extra[-1].startswith("-") else None
+    main_dir = worktrees()[0][0]
+    branch = git("branch", "--show-current", cwd=path) or target(name)[1]
     if host() == "orca" and not resume_:
         if extra:
             sys.exit(f"Orca starts agents with --model, --effort and a brief only, "
                      f"not {shlex.join(extra)}: `git config zw.host zellij` for those.")
-        launch(name, path, spec, brief, focus_=focus_)
+        task_id = _mint_task_id(name)
+        onto = base(branch, cwd=main_dir)
+        base_commit = git("rev-parse", onto, cwd=main_dir) or None
+        launch(name, path, spec, brief, focus_=focus_, task_id=task_id,
+               branch=branch, base_commit=base_commit, main_dir=main_dir)
         return
     record(name, spec)
     if resume_:
         start(name, host(), path, focus_=focus_)
     else:
+        task_id = _mint_task_id(name)
+        onto = base(branch, cwd=main_dir)
+        base_commit = git("rev-parse", onto, cwd=main_dir) or None
+        git("config", f"branch.{branch}.zwTask", task_id, cwd=main_dir)
         own = {"codex": list(CODEX_FLAGS), "agy": list(AGY_FLAGS)}.get(agent, ["--name", name])
         prompt = (["-i", brief] if agent == "agy" else [brief]) if brief else []
-        open_tab(name, path, [agent, *own, *flags(spec), *extra, *prompt])
+        open_tab(name, path, [agent, *own, *flags(spec), *extra, *prompt], env_task=task_id)
+        emit_event("task.start", {
+            "name": name, "base": base_commit, "provider": spec["agent"],
+            "model": spec.get("model"), "effort": spec.get("effort"),
+            "host": "zellij", "versions": provider_versions(),
+        }, cwd=path, task=task_id, session=None, branch=branch, worktree=path)
 
 
-def launch(name, path, spec, brief, focus_=False):
+def launch(name, path, spec, brief, focus_=False, task_id=None, branch=None, base_commit=None, main_dir=None):
     """A new agent in Orca, started as Orca starts one."""
     reachable(path)
     if spec.get("effort") and not spec.get("model"):
         sys.exit("Orca takes --effort only with --model.")
+    if task_id and branch:
+        git("config", f"branch.{branch}.zwTask", task_id, cwd=main_dir or path)
     orca("worktree", "set", "--worktree", f"path:{path}", "--display-name", name,
          "--workspace-status", "in-progress", "--comment", "")
     reply = orca("agent", "launch", "--agent", ORCA_AGENT[spec["agent"]], "--worktree", f"path:{path}",
@@ -849,6 +886,12 @@ def launch(name, path, spec, brief, focus_=False):
         sys.exit(f"`orca agent launch` gave {name} no terminal: {reply}")
     record(name, spec)
     orca("terminal", "rename", "--terminal", handle, "--title", name)
+    if task_id:
+        emit_event("task.start", {
+            "name": name, "base": base_commit, "provider": spec["agent"],
+            "model": spec.get("model"), "effort": spec.get("effort"),
+            "host": "orca", "versions": provider_versions(),
+        }, cwd=path, task=task_id, session=None, branch=branch, worktree=path)
     print(f"{name}: {spec['agent']} in Orca ({handle})")
     if spec["agent"] != "claude":
         return
@@ -878,14 +921,15 @@ def retire(tab, zsession=None):
         zellij("close-tab-by-id", str(tab), name=zsession)
 
 
-def open_tab(name, path, command, replace=None):
+def open_tab(name, path, command, replace=None, env_task=None):
     """Zellij tab NAME running COMMAND in PATH, then tab id REPLACE retired.
     Only with a client attached: zellij 0.45 crashes on a tab made with
     none (it has no size to lay out in)."""
     attached()
     if not clients():
         sys.exit(f"No client is attached to zellij session {session()!r}: attach one, then retry.")
-    if zellij("new-tab", "--layout-string", layout(name, path, command)) is None:
+    launched = ["env", f"ZW_TASK={env_task}", *command] if env_task else command
+    if zellij("new-tab", "--layout-string", layout(name, path, launched)) is None:
         sys.exit("zellij couldn't open the tab.")
     if replace is not None:
         retire(replace)
@@ -900,7 +944,10 @@ def start(name, on, path, left=None, agent="", focus_=False):
         left = found and {**found[0], "session": session(),
                           "started": found[1].get("terminal_command") or ""}
     started = left["started"] if left else ""
-    command = resuming(name, on, recorded(name, started, agent), path)
+    spec = recorded(name, started, agent)
+    command = resuming(name, on, spec, path)
+    branch = git("branch", "--show-current", cwd=path) or target(name)[1]
+    task_id = task_for_branch(branch, cwd=path)
     # Only a tab zw made for NAME holds nothing else of the person's.
     replace = left["tab_id"] if left and MARK_RE.sub("", left["name"]) == name else None
     if on == "orca":
@@ -908,8 +955,9 @@ def start(name, on, path, left=None, agent="", focus_=False):
         orca("worktree", "set", "--worktree", f"path:{path}", "--display-name", name,
              "--workspace-status", "in-progress", "--comment", "")
         shell = ["--shell", "git-bash"] if os.name == "nt" else []  # the command is POSIX-quoted
+        launched = ["env", f"ZW_TASK={task_id}", *command] if task_id else command
         reply = orca("terminal", "create", "--worktree", f"path:{path}", "--title", name, *shell,
-                     "--command", shlex.join(command), failing=f"`orca terminal create` failed for {name}")
+                     "--command", shlex.join(launched), failing=f"`orca terminal create` failed for {name}")
         if focus_:
             handle = ((reply or {}).get("terminal") or {}).get("handle")
             if not (handle and orca("terminal", "switch", "--terminal", handle)):
@@ -917,11 +965,13 @@ def start(name, on, path, left=None, agent="", focus_=False):
         if replace is not None:
             retire(replace, left["session"])
     elif left and left["session"] != session():
-        open_tab(name, path, command)
+        open_tab(name, path, command, env_task=task_id)
         if replace is not None:
             retire(replace, left["session"])
     else:
-        open_tab(name, path, command, replace=replace)
+        open_tab(name, path, command, replace=replace, env_task=task_id)
+    emit_event("task.resume", {"host": on, "provider": spec["agent"]},
+               cwd=path, task=task_id, session=None, branch=branch, worktree=path)
     view = next((w.split("=", 1)[1] for w in started.split() if w.startswith("ORCA_TAB_ID=")), None)
     if view:
         close_views(lambda t: t.get("tabId") == view)
@@ -990,6 +1040,8 @@ def msg(name, text):
                  f"typing would answer. Look at it in {running.host} first.")
     if not type_into(running, text):
         sys.exit(f"Couldn't type into {name} in {running.host}.")
+    to_branch = target(name)[1]
+    emit_event("msg", {"to": name, "to_task": task_for_branch(to_branch), "chars": len(text)}, session=None)
 
 
 def go(name):
@@ -1077,6 +1129,11 @@ def done(name, checked=False):
             sys.exit(f"{path} has uncommitted changes.")
         if not checked and git("rev-list", "--count", f"{onto}..{branch}", cwd=main) not in ("", "0"):
             sys.exit(f"{branch} has commits not in {onto}: land it first.")
+    task_id = task_for_branch(branch, cwd=main)
+    tip = git("rev-parse", "--verify", f"refs/heads/{branch}", cwd=main) or None
+    onto = base(branch, cwd=main) if tip else ""
+    ahead = git("rev-list", "--count", f"{onto}..{branch}", cwd=main) if (tip and onto) else ""
+    outcome = "landed" if (checked or (tip and ahead == "0")) else "abandoned"
     close_views(lambda t: os.path.realpath(t.get("worktreePath", "")) == os.path.realpath(path))
     if os.path.isdir(path):
         release(path, branch, main)
@@ -1084,6 +1141,8 @@ def done(name, checked=False):
     if tab is not None:
         retire(tab["tab_id"])
     git("config", "--remove-section", f"zw.{name}", cwd=main)
+    emit_event("task.end", {"outcome": outcome, "tip": tip},
+               cwd=main, task=task_id, session=None, branch=branch, worktree=path)
 
 
 def release(path, branch, main):
@@ -1112,17 +1171,16 @@ def status(state):
     """Mark the zellij tab holding this pane: `name ●` while the agent works."""
     pane = os.environ.get("ZELLIJ_PANE_ID")
     out = pane and zellij("list-panes", "--json", "--tab", capture=True)
-    if not out:
-        return
-    tab = next((p["tab_id"] for p in json.loads(out)
-                if not p["is_plugin"] and str(p["id"]) == pane), None)
-    name = next((t["name"] for t in tabs() if t["tab_id"] == tab), None)
-    if name is None:
-        return
-    unmarked = MARK_RE.sub("", name)
-    marked = f"{unmarked} {MARKS[state]}" if MARKS[state] else unmarked
-    if marked != name:
-        zellij("rename-tab-by-id", str(tab), marked)
+    if out:
+        tab = next((p["tab_id"] for p in json.loads(out)
+                    if not p["is_plugin"] and str(p["id"]) == pane), None)
+        name = next((t["name"] for t in tabs() if t["tab_id"] == tab), None)
+        if name is not None:
+            unmarked = MARK_RE.sub("", name)
+            marked = f"{unmarked} {MARKS[state]}" if MARKS[state] else unmarked
+            if marked != name:
+                zellij("rename-tab-by-id", str(tab), marked)
+    emit_event("agent.state", {"state": state})
 
 
 NAMED = ("new", "add", "path", "go", "done", "resume", "msg")

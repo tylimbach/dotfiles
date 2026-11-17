@@ -41,6 +41,12 @@ own history. Claude sessions are named NAME on either host (`--name`,
   zw msg NAME TEXT                 TEXT and Enter into NAME's agent, on either host
   zw status working|input|done|clear
                                    agent hooks: mark this pane's zellij tab name
+                                   and emit an agent.state event
+  zw task                          current task ID (ZW_TASK, else branch zwTask)
+  zw emit KIND [key=value ...] [--json JSON]
+                                   append an event to <git-common-dir>/zw/events.jsonl
+  zw hook session-start            read provider hook JSON on stdin, emit session.bind
+  zw report [NAME|TASK] [--json]   per-task wall time, states, steps, msgs, and tokens
 
 Orca starts agents with --model, --effort and the brief only; zellij passes
 other ARGS to the agent, and a move drops them. Setup: orca/README.md.

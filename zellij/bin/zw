@@ -384,6 +384,296 @@ def hook_session_start():
         pass
 
 
+CLAUDE_USAGE_KINDS = (
+    "input_tokens",
+    "cache_creation_input_tokens",
+    "cache_read_input_tokens",
+    "output_tokens",
+)
+
+
+def _parse_ts(value):
+    if not value or not isinstance(value, str):
+        return None
+    try:
+        return datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _task_name_from_id(task_id):
+    return re.sub(r"-\d{8}T\d{6}Z$", "", task_id)
+
+
+def _collect_claude_tokens(paths):
+    """Port of tools/token_report.py: deduplicate by message.id and across forks."""
+    totals = [0, 0, 0, 0]
+    owned = set()
+    ordered = sorted(set(paths), key=lambda p: ("subagents" in os.path.normpath(p).split(os.sep), p))
+    for path in ordered:
+        if not os.path.isfile(path):
+            continue
+        groups = {}
+        try:
+            with open(path, encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    try:
+                        row = json.loads(line)
+                    except ValueError:
+                        continue
+                    if not isinstance(row, dict) or not row.get("timestamp"):
+                        continue
+                    if row.get("type") != "assistant":
+                        continue
+                    msg_obj = row.get("message")
+                    if not isinstance(msg_obj, dict):
+                        continue
+                    mid = msg_obj.get("id")
+                    if not mid:
+                        continue
+                    usage = msg_obj.get("usage") or {}
+                    if not isinstance(usage, dict):
+                        continue
+                    group = groups.setdefault(mid, [0, 0, 0, 0])
+                    for i, key in enumerate(CLAUDE_USAGE_KINDS):
+                        val = usage.get(key, 0) or 0
+                        if val > group[i]:
+                            group[i] = val
+        except OSError:
+            continue
+        for mid, counts in groups.items():
+            if mid not in owned and sum(counts) > 0:
+                for i in range(4):
+                    totals[i] += counts[i]
+        owned.update(groups.keys())
+    return {
+        "uncached_input": totals[0],
+        "cache_write": totals[1],
+        "cache_read": totals[2],
+        "output": totals[3],
+    }
+
+
+def _claude_transcript_files(transcript_path):
+    if not transcript_path:
+        return []
+    files = []
+    if os.path.isfile(transcript_path):
+        files.append(transcript_path)
+    if transcript_path.endswith(".jsonl"):
+        sub_dir = os.path.join(transcript_path[:-len(".jsonl")], "subagents")
+        if os.path.isdir(sub_dir):
+            files.extend(sorted(glob.glob(os.path.join(sub_dir, "*.jsonl"))))
+    return files
+
+
+def _union_seconds(intervals):
+    if not intervals:
+        return 0.0
+    merged = []
+    for start_s, end_s in sorted(intervals):
+        if not merged or start_s > merged[-1][1]:
+            merged.append([start_s, end_s])
+        else:
+            merged[-1][1] = max(merged[-1][1], end_s)
+    return sum(b - a for a, b in merged)
+
+
+def build_task_report(task_id, events, msg_count, now=None):
+    now = now or _utc_now()
+    timed = []
+    for idx, ev in enumerate(events):
+        dt = _parse_ts(ev.get("ts"))
+        if dt is not None:
+            timed.append((dt, idx, ev))
+    timed.sort(key=lambda item: (item[0], item[1]))
+    t_start = timed[0][0] if timed else now
+    end_ev = next((item for item in reversed(timed) if item[2].get("kind") == "task.end"), None)
+    t_end = end_ev[0] if end_ev else now
+    wall_seconds = max(0.0, (t_end - t_start).total_seconds())
+
+    start_ev = next((item[2] for item in timed if item[2].get("kind") == "task.start"), None)
+    last_resume = next((item[2] for item in reversed(timed) if item[2].get("kind") == "task.resume"), None)
+    name = (start_ev.get("name") if start_ev else None) or _task_name_from_id(task_id)
+
+    states = {}
+    cur_state = None
+    cur_ts = None
+    for dt, _, ev in timed:
+        if ev.get("kind") != "agent.state":
+            continue
+        if dt > t_end:
+            continue
+        new_state = ev.get("state")
+        if cur_state is not None and cur_ts is not None:
+            states[cur_state] = states.get(cur_state, 0.0) + max(0.0, (dt - cur_ts).total_seconds())
+        cur_state = new_state
+        cur_ts = dt
+    if cur_state is not None and cur_ts is not None:
+        states[cur_state] = states.get(cur_state, 0.0) + max(0.0, (t_end - cur_ts).total_seconds())
+
+    step_counts = collections.Counter()
+    step_sums = collections.Counter()
+    step_intervals = collections.defaultdict(list)
+    for dt, _, ev in timed:
+        if ev.get("kind") != "step":
+            continue
+        group = ev.get("group") or "other"
+        try:
+            secs = max(0.0, float(ev.get("seconds") or 0.0))
+        except (TypeError, ValueError):
+            secs = 0.0
+        step_counts[group] += 1
+        step_sums[group] += secs
+        s_dt = _parse_ts(ev.get("start")) or (dt - datetime.timedelta(seconds=secs))
+        s_epoch = s_dt.timestamp()
+        step_intervals[group].append((s_epoch, s_epoch + secs))
+
+    steps = {}
+    for group in sorted(step_counts):
+        steps[group] = {
+            "count": step_counts[group],
+            "sum_seconds": round(step_sums[group], 6),
+            "union_seconds": round(_union_seconds(step_intervals[group]), 6),
+        }
+
+    sessions_list = []
+    seen_sessions = {}
+    for _, _, ev in timed:
+        if ev.get("kind") != "session.bind":
+            continue
+        prov = ev.get("provider")
+        sid = ev.get("session_id") or ev.get("session")
+        tpath = ev.get("transcript_path")
+        key = (prov, sid)
+        if key in seen_sessions:
+            if tpath and not seen_sessions[key].get("transcript_path"):
+                seen_sessions[key]["transcript_path"] = tpath
+            continue
+        rec = {"provider": prov, "session_id": sid, "transcript_path": tpath}
+        seen_sessions[key] = rec
+        sessions_list.append(rec)
+
+    provider = (
+        (start_ev.get("provider") if start_ev else None)
+        or (last_resume.get("provider") if last_resume else None)
+        or (sessions_list[0]["provider"] if sessions_list else None)
+    )
+    task_host = (
+        (last_resume.get("host") if last_resume else None)
+        or (start_ev.get("host") if start_ev else None)
+    )
+    outcome = end_ev[2].get("outcome") if end_ev else None
+
+    claude_files = []
+    other_providers = []
+    for s in sessions_list:
+        p = s.get("provider")
+        if p == "claude":
+            claude_files.extend(_claude_transcript_files(s.get("transcript_path")))
+        elif p and p not in other_providers:
+            other_providers.append(p)
+    if not sessions_list and provider in ("codex", "agy"):
+        other_providers.append(provider)
+
+    if other_providers and not claude_files:
+        tokens = "n/a (phase 2)"
+    elif other_providers and claude_files:
+        tokens = {"claude": _collect_claude_tokens(claude_files)}
+        for p in other_providers:
+            tokens[p] = "n/a (phase 2)"
+    else:
+        tokens = _collect_claude_tokens(claude_files)
+
+    return {
+        "task": task_id,
+        "name": name,
+        "provider": provider,
+        "host": task_host,
+        "outcome": outcome,
+        "wall_seconds": round(wall_seconds, 6),
+        "states": {k: round(v, 6) for k, v in states.items()},
+        "steps": steps,
+        "sessions": sessions_list,
+        "msgs": msg_count,
+        "tokens": tokens,
+    }
+
+
+def report(target_name=None, use_json=False):
+    _, common_dir, _ = _find_git()
+    log = event_log_path(common_dir)
+    by_task = collections.OrderedDict()
+    msgs_to = collections.Counter()
+    if log and os.path.isfile(log):
+        with open(log, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    ev = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(ev, dict):
+                    continue
+                if ev.get("kind") == "msg" and ev.get("to_task"):
+                    msgs_to[ev["to_task"]] += 1
+                tid = ev.get("task")
+                if tid:
+                    by_task.setdefault(tid, []).append(ev)
+
+    reports = [build_task_report(tid, evs, msgs_to.get(tid, 0)) for tid, evs in by_task.items()]
+    if target_name:
+        reports = [r for r in reports if r["task"] == target_name or r["name"] == target_name]
+
+    if use_json:
+        print(json.dumps(reports, indent=2))
+        return
+    if not reports:
+        print(f"No tasks matching {target_name}." if target_name else "No tasks recorded.")
+        return
+    for r in reports:
+        meta = [f"name: {r['name']}"]
+        if r["provider"]:
+            meta.append(f"provider: {r['provider']}")
+        if r["host"]:
+            meta.append(f"host: {r['host']}")
+        meta.append(f"outcome: {r['outcome'] or 'running'}")
+        print(f"task: {r['task']} ({', '.join(meta)})")
+        print(f"  wall: {r['wall_seconds']:.1f}s")
+        if r["states"]:
+            state_str = ", ".join(f"{k}={v:.1f}s" for k, v in r["states"].items())
+        else:
+            state_str = "none"
+        print(f"  states: {state_str}")
+        if r["steps"]:
+            print("  steps:")
+            for g, info in r["steps"].items():
+                print(f"    {g}: sum={info['sum_seconds']:.1f}s, union={info['union_seconds']:.1f}s ({info['count']})")
+        else:
+            print("  steps: none")
+        if r["sessions"]:
+            sess_str = ", ".join(f"{s['provider'] or '?'}:{s['session_id'] or '?'}" for s in r["sessions"])
+        else:
+            sess_str = "none"
+        print(f"  sessions: {sess_str}")
+        print(f"  msgs: {r['msgs']}")
+        tok = r["tokens"]
+        if isinstance(tok, str):
+            print(f"  tokens: {tok}")
+        elif "uncached_input" in tok:
+            print(f"  tokens: uncached_input={tok['uncached_input']}, cache_write={tok['cache_write']}, "
+                  f"cache_read={tok['cache_read']}, output={tok['output']}")
+        else:
+            for prov, val in tok.items():
+                if isinstance(val, str):
+                    print(f"  tokens ({prov}): {val}")
+                else:
+                    print(f"  tokens ({prov}): uncached_input={val['uncached_input']}, "
+                          f"cache_write={val['cache_write']}, cache_read={val['cache_read']}, output={val['output']}")
+
+
 def zw_task():
     wt, _, branch = _find_git()
     task_id = resolve_task(cwd=wt, branch=branch)
@@ -1277,6 +1567,13 @@ def main():
         zw_task()
     elif command == "hook" and rest == ["session-start"]:
         hook_session_start()
+    elif command == "report":
+        use_json = "--json" in rest
+        names = [a for a in rest if a != "--json"]
+        if len(names) <= 1 and not any(a.startswith("-") for a in names):
+            report(names[0] if names else None, use_json=use_json)
+        else:
+            sys.exit(__doc__)
     else:
         sys.exit(__doc__)
 

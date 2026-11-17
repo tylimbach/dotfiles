@@ -239,3 +239,7 @@ review() { nvim -c "Review $*"; }
 
 # This machine's own additions (installer PATHs, work tools): not in the repo.
 [[ -f "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"
+
+
+# Added by Antigravity CLI installer
+export PATH="/Users/ty/.local/bin:$PATH"

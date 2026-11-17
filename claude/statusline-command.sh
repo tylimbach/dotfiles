@@ -59,6 +59,8 @@ short_cwd="${cwd/#$HOME/~}"
 
 line="${GREEN}${time_str}${RESET} ${CYAN}${user_str}${RESET}@${BLUE}${host_str}${RESET} ${YELLOW}${short_cwd}${RESET}"
 [ -n "$branch" ] && line="${line} (${branch})"
+model=$(echo "$input" | jq -r '.model.display_name // .model.id // empty')
+[ -n "$model" ] && line="${line}  ${CYAN}${model}${RESET}"
 line="${line}${ctx_str}${rate_str}"
 
 printf "%b\n" "$line"

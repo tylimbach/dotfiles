@@ -4,6 +4,7 @@
 	diffFilter = delta --color-only
 [delta]
 	navigate = true
+	tabs = 4
 [delta "gruvbox-dark"]
 	dark = true
 	syntax-theme = gruvbox-dark

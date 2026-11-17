@@ -227,6 +227,8 @@ else
 fi
 _load_ls_colors "$NVIM_THEME"
 export DELTA_FEATURES="+gruvbox-$NVIM_THEME"
+sbs() { DELTA_FEATURES="$DELTA_FEATURES side-by-side" "$@"; }
+review() { nvim -c "Review $*"; }
 
 # ============================================================
 # Misc

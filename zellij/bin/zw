@@ -331,6 +331,59 @@ def emit_cli(args):
         pass
 
 
+def _detect_hook_provider(data, session_id, transcript_path):
+    if isinstance(transcript_path, str):
+        if "/.codex/" in transcript_path or os.path.basename(transcript_path).startswith("rollout-"):
+            return "codex"
+        if "/.claude/" in transcript_path:
+            return "claude"
+    if session_id and session_id == os.environ.get("CLAUDE_CODE_SESSION_ID"):
+        return "claude"
+    if session_id and session_id == os.environ.get("CODEX_THREAD_ID"):
+        return "codex"
+    if os.environ.get("CLAUDE_PROJECT_DIR") and not os.environ.get("CODEX_HOME"):
+        return "claude"
+    if os.environ.get("CODEX_HOME") or os.environ.get("CODEX_CI"):
+        return "codex"
+    return "claude" if "source" in data else None
+
+
+def hook_session_start():
+    try:
+        raw = sys.stdin.read()
+        data = json.loads(raw) if raw.strip() else None
+        if not isinstance(data, dict):
+            return
+        cwd = data.get("cwd") or None
+        if not cwd:
+            workspaces = data.get("workspacePaths")
+            if isinstance(workspaces, list) and workspaces:
+                cwd = workspaces[0]
+        if cwd and not os.path.isdir(cwd):
+            cwd = None
+        if "conversationId" in data or "transcriptPath" in data or "hookEventName" in data:
+            provider = "agy"
+            session_id = data.get("conversationId") or data.get("session_id") or None
+            transcript_path = data.get("transcriptPath") or data.get("transcript_path") or None
+        else:
+            session_id = data.get("session_id") or None
+            transcript_path = data.get("transcript_path") or None
+            provider = _detect_hook_provider(data, session_id, transcript_path)
+        emit_event(
+            "session.bind",
+            {
+                "provider": provider,
+                "session_id": session_id,
+                "transcript_path": transcript_path,
+                "source": "hook",
+            },
+            cwd=cwd,
+            session=session_id,
+        )
+    except Exception:
+        pass
+
+
 def zw_task():
     wt, _, branch = _find_git()
     task_id = resolve_task(cwd=wt, branch=branch)
@@ -1222,6 +1275,8 @@ def main():
         emit_cli(rest)
     elif command == "task" and not rest:
         zw_task()
+    elif command == "hook" and rest == ["session-start"]:
+        hook_session_start()
     else:
         sys.exit(__doc__)
 
